@@ -1,0 +1,142 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewBag.Title</title>
+    @Styles.Render("~/Content/css")
+    @Scripts.Render("~/bundles/modernizr")
+    <style>
+        .navbar-inverse {
+            background-color: white !important;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+
+        .navbar-inverse .navbar-nav > li > a {
+            color: #334155;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            padding: 14px 18px;
+            border-bottom: 3px solid transparent;
+            transition: color 0.15s ease, border-bottom 0.15s ease;
+            outline: none !important;
+        }
+
+        .navbar-inverse .navbar-nav > li > a:hover,
+        .navbar-inverse .navbar-nav > li > a:focus,
+        .navbar-inverse .navbar-nav > li > a:active {
+            color: #0f766e;
+            background-color: transparent;
+            outline: none !important;
+        }
+
+        .navbar-inverse .navbar-nav > .active > a,
+        .navbar-inverse .navbar-nav > .active > a:hover,
+        .navbar-inverse .navbar-nav > .active > a:focus {
+            color: #0f766e;
+            background-color: transparent;
+            border-bottom-color: #0f766e;
+            outline: none !important;
+        }
+
+        .navbar-inverse .navbar-nav > .active > a,
+        .navbar-inverse .navbar-nav > .active > a:focus {
+            color: #0f766e;
+            background-color: transparent;
+            border-bottom-color: #0f766e;
+            outline: none !important;
+        }
+
+        .navbar-inverse .navbar-nav > .active > a:hover {
+            color: #0f766e;
+            background-color: transparent;
+            outline: none !important;
+        }
+
+        .navbar-brand {
+            font-weight: 900;
+            font-size: 16px;
+            color: #0f172a !important;
+            letter-spacing: -0.01em;
+            padding: 14px 18px;
+        }
+
+        body {
+            padding-top: 60px;
+        }
+
+        .body-content {
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .btn-logout {
+            background: none;
+            border: 2px solid #fca5a5;
+            border-radius: 8px;
+            color: #ef4444;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 6px 18px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin: 9px 0;
+            line-height: 1.4;
+        }
+
+        .btn-logout:hover {
+            border-color: #dc2626;
+            color: #fff;
+            background: #dc2626;
+        }
+    </style>
+</head>
+<body>
+    @if (Session["IsLoggedIn"] != null && (bool)Session["IsLoggedIn"])
+    {
+    <div class="navbar navbar-inverse navbar-fixed-top">
+        <div class="container">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+            </div>
+            <div class="navbar-collapse collapse">
+                <ul class="nav navbar-nav">
+                    <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "Report" ? "active" : "")">
+                        @Html.ActionLink("Report Master", "Index", "Report")
+                    </li>
+                    <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "CompanyConfig" ? "active" : "")">
+                        @Html.ActionLink("Company Config", "Index", "CompanyConfig")
+                    </li>
+                    <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "AlertConfig" ? "active" : "")">
+                        @Html.ActionLink("Alert Config", "Index", "AlertConfig")
+                    </li>
+                </ul>
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <form method="post" action="@Url.Action("Logout", "Home")" style="margin:0;padding:0;display:inline">
+                            <button type="submit" class="btn-logout">Logout</button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    }
+    <div class="container-fluid body-content">
+        @RenderBody()
+        <hr />
+    </div>
+
+    @Scripts.Render("~/bundles/jquery")
+    @Scripts.Render("~/bundles/bootstrap")
+    @RenderSection("scripts", required: false)
+</body>
+</html>

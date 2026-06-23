@@ -1,0 +1,358 @@
+@model Report.Models.ReportFilteringColumnGridViewModel
+
+@{
+    ViewBag.Title = "Filtering Columns";
+}
+
+<link rel="stylesheet" href="~/Styles/ReportFilteringColumn.css" />
+
+<div class="container-fluid" style="margin-top:20px;">
+
+    <div id="toast" style="display:none; position:fixed; top:80px; right:20px; z-index:9999; padding:12px 20px; border-radius:4px; color:#fff; font-weight:bold; box-shadow:0 4px 8px rgba(0,0,0,0.2);"></div>
+
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">X</button>
+                    <h4 class="modal-title">Confirm Delete</h4>
+                </div>
+                <div class="modal-body">
+                    <p id="deleteConfirmMessage">Are you sure you want to delete this record?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="deleteConfirmOk">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="saveConfirmModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">X</button>
+                    <h4 class="modal-title">Confirm Save</h4>
+                </div>
+                <div class="modal-body">
+                    <p id="saveConfirmMessage">Are you sure you want to save this row?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveConfirmOk">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="successModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">X</button>
+                    <h4 class="modal-title">Success</h4>
+                </div>
+                <div class="modal-body">
+                    <p id="successModalMessage">Row saved successfully.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div style="text-align:center; margin-bottom:20px;">
+        @if (!string.IsNullOrEmpty(Model.FilterLinkItemName))
+        {
+            <div style="font-size:30px; font-weight:900; color:#1a1a2e; letter-spacing:0.5px;">@Model.FilterLinkItemName</div>
+        }
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;">
+        <h3 style="margin:0; font-weight:700;"><a href="#" onclick="history.back(); return false;" style="text-decoration:none; color:inherit;">&larr;</a> Filtering Columns</h3>
+        <p class="text-muted" style="margin:0; font-size:14px;">Total Records: @Model.TotalRecords</p>
+    </div>
+
+    <div class="report-toolbar">
+        @using (Html.BeginForm("Index", "ReportFilteringColumn", FormMethod.Get, new { @class = "toolbar-form" }))
+        {
+            <div class="sort-direction-box">
+                @Html.DropDownListFor(
+                    x => x.SortDirection,
+                    new SelectList(
+                        new[]
+                        {
+                            new { Value = "asc", Text = "Ascending" },
+                            new { Value = "desc", Text = "Descending" }
+                        },
+                        "Value",
+                        "Text",
+                        Model.SortDirection),
+                    new { @class = "form-control page-size-select", onchange = "this.form.submit()" })
+            </div>
+
+            <input type="hidden" name="SortColumn" value="ReportFilterColumnId" />
+            <input type="hidden" name="PageSize" value="5" />
+            <input type="hidden" name="FilterLinkItemName" value="@Model.FilterLinkItemName" />
+        }
+
+        <button type="button" id="btnDeletedRecords" class="btn modern-btn" style="margin-left:10px; background:#6b21a8 !important; border-color:#6b21a8 !important; color:#fff !important; font-weight:700;">Deleted Records</button>
+        <button type="button" id="btnAddRow" class="btn modern-btn modern-btn-primary">Add Row</button>
+    </div>
+
+    <div class="table-panel-container">
+        <div class="table-wrapper" id="tableWrapper">
+    <div class="table-responsive modern-table-shell">
+        <table class="table modern-report-table">
+            <thead>
+                <tr>
+                    <th>Report Filter Column Id</th>
+                    <th>Report Col Id</th>
+                    <th>Report Id</th>
+                    <th>Data Type</th>
+                    <th>Operator</th>
+                    <th>Value1</th>
+                    <th>Value2</th>
+                    <th>Condition</th>
+                    <th>Is Disable</th>
+                    <th style="width:200px">Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (Model.Items == null || !Model.Items.Any())
+                {
+                    <tr>
+                        <td colspan="10" class="text-center text-muted">No records found.</td>
+                    </tr>
+                }
+                else
+                {
+                    var rowIndex = 0;
+                    foreach (var item in Model.Items)
+                    {
+                        rowIndex++;
+                        var srNo = ((Model.PageNumber - 1) * Model.PageSize) + rowIndex;
+                        <tr id="reportfilteringcolumn-@srNo" data-table="@ViewBag.TableName"
+                            data-reportfiltercolumnid="@item.ReportFilterColumnId"
+                            data-reportcolumnid="@(item.ReportColumnId.HasValue ? item.ReportColumnId.Value.ToString() : "")"
+                            data-reportid="@(item.ReportId.HasValue ? item.ReportId.Value.ToString() : "")"
+                            data-datatype="@item.DataType"
+                            data-operator="@item.Operator"
+                            data-value1="@item.Value1"
+                            data-value2="@item.Value2"
+                            data-condn="@item.Condn"
+                            data-isdisable="@(item.IsDisable.HasValue ? (item.IsDisable.Value ? "1" : "0") : "")">
+                            <td>@item.ReportFilterColumnId</td>
+                            <td class="grid-text">@(item.ReportColumnId.HasValue ? item.ReportColumnId.Value.ToString() : "")</td>
+                            <td class="grid-text">@(item.ReportId.HasValue ? item.ReportId.Value.ToString() : "")</td>
+                            <td>@item.DataType</td>
+                            <td>@item.Operator</td>
+                            <td class="grid-text" title="@item.Value1">@item.Value1</td>
+                            <td>@item.Value2</td>
+                            <td>@item.Condn</td>
+                            <td>@(item.IsDisable.HasValue ? (item.IsDisable.Value ? "1" : "0") : "")</td>
+                            <td class="action-cell">
+                                <button type="button" class="btn btn-xs btn-primary btn-edit">Edit</button>
+                                <button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>
+                                <button type="button" class="btn btn-xs btn-info btn-view-repfiltercol-audit" data-table="@ViewBag.AuditTableName" data-id="@item.ReportFilterColumnId" data-linkitemname="@Model.FilterLinkItemName" style="margin-left:3px;">View</button>
+                            </td>
+                        </tr>
+                        <tr class="edit-row" style="display:none" data-editfor="@srNo">
+                            <td colspan="10">
+                                <div class="edit-form">
+                                    <div class="edit-form-row">
+                                        <div class="ef-field">
+                                            <label>Report Col Id<span class="required">*</span></label>
+                                            <input type="number" class="form-control" data-column="ReportColumnId">
+                                        </div>
+                                        <div class="ef-field">
+                                            <label>Report Id<span class="required">*</span></label>
+                                            <input type="number" class="form-control" data-column="ReportId" readonly>
+                                        </div>
+                                        <div class="ef-field">
+                                            <label>Data Type<span class="required">*</span></label>
+                                            <select class="form-control" data-column="DataType">
+                                                @foreach (var dt in ViewBag.DatatypeOptions as List<SelectListItem>)
+                                                {
+                                                    <option value="@dt.Value">@dt.Text</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="ef-field">
+                                            <label>Operator<span class="required">*</span></label>
+                                            <input type="text" class="form-control" data-column="Operator">
+                                        </div>
+                                        <div class="ef-field">
+                                            <label>Value1</label>
+                                            <input type="text" class="form-control" data-column="Value1">
+                                        </div>
+                                        <div class="ef-field">
+                                            <label>Value2</label>
+                                            <input type="text" class="form-control" data-column="Value2">
+                                        </div>
+                                        <div class="ef-field">
+                                            <label>Condition</label>
+                                            <select class="form-control" data-column="Condn">
+                                                <option value="1">1</option>
+                                                <option value="0" selected>0</option>
+                                            </select>
+                                        </div>
+                                        <div class="ef-field">
+                                            <label>Is Disable</label>
+                                            <select class="form-control" data-column="IsDisable">
+                                                <option value="1">1</option>
+                                                <option value="0" selected>0</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="edit-form-actions">
+                                        <button type="button" class="btn btn-save-form">Save</button>
+                                        <button type="button" class="btn btn-cancel-form">Cancel</button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    </div>
+    <div id="auditPanel" style="display:none; flex:0 0 calc(50% - 15px); min-width:280px; border:1px solid #ddd; border-radius:6px; background:#fff; margin-left:15px; align-self:stretch;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#f5f5f5; border-bottom:1px solid #ddd;">
+            <strong style="font-size:14px; color:#1a1a2e;" id="auditPanelTitle">Change History</strong>
+            <button type="button" id="btnCloseAudit" style="border:none; background:none; font-size:22px; cursor:pointer; line-height:1; color:#666; padding:0 4px;">&times;</button>
+        </div>
+        <iframe id="auditIframe" style="width:100%; height:calc(100vh - 250px); border:none; display:block;"></iframe>
+    </div>
+</div>
+
+    <div class="bottom-bar">
+        <nav>
+            <ul class="pagination pagination-sm" style="display:flex; flex-wrap:nowrap; overflow-x:auto; margin:0;">
+                <li class="@(Model.HasPreviousPage ? "" : "disabled")">
+                    @if (Model.HasPreviousPage)
+                    {
+                        <a href="@Url.Action("Index", new {
+                            SearchText = Model.SearchText,
+                            PageSize = Model.PageSize,
+                            SortColumn = Model.SortColumn,
+                            SortDirection = Model.SortDirection,
+                            PageNumber = Model.PageNumber - 1,
+                            FilterReportId = Model.FilterReportId,
+                            FilterLinkItemName = Model.FilterLinkItemName
+
+                        })">Previous</a>
+                    }
+                    else
+                    {
+                        <span>Previous</span>
+                    }
+                </li>
+
+                @{
+                    var windowSize = 5;
+                    var halfWindow = windowSize / 2;
+                    var startPage = Math.Max(1, Model.PageNumber - halfWindow);
+                    var endPage = Math.Min(Model.TotalPages, startPage + windowSize - 1);
+                    startPage = Math.Max(1, endPage - windowSize + 1);
+                }
+
+                @if (startPage > 1)
+                {
+                    <li><a href="@Url.Action("Index", new {
+                        SearchText = Model.SearchText,
+                        PageSize = Model.PageSize,
+                        SortColumn = Model.SortColumn,
+                        SortDirection = Model.SortDirection,
+                        PageNumber = 1,
+                        FilterReportId = Model.FilterReportId,
+                        FilterLinkItemName = Model.FilterLinkItemName
+
+                    })">1</a></li>
+                    if (startPage > 2)
+                    {
+                        <li class="disabled"><a href="#">...</a></li>
+                    }
+                }
+
+                @for (var page = startPage; page <= endPage; page++)
+                {
+                    <li class="@(page == Model.PageNumber ? "active" : "")">
+                        <a href="@Url.Action("Index", new {
+                            SearchText = Model.SearchText,
+                            PageSize = Model.PageSize,
+                            SortColumn = Model.SortColumn,
+                            SortDirection = Model.SortDirection,
+                            PageNumber = page,
+                            FilterReportId = Model.FilterReportId,
+                            FilterLinkItemName = Model.FilterLinkItemName
+
+                        })">@page</a>
+                    </li>
+                }
+
+                @if (endPage < Model.TotalPages)
+                {
+                    if (endPage < Model.TotalPages - 1)
+                    {
+                        <li class="disabled"><a href="#">...</a></li>
+                    }
+                    <li><a href="@Url.Action("Index", new {
+                        SearchText = Model.SearchText,
+                        PageSize = Model.PageSize,
+                        SortColumn = Model.SortColumn,
+                        SortDirection = Model.SortDirection,
+                        PageNumber = Model.TotalPages,
+                        FilterReportId = Model.FilterReportId,
+                        FilterLinkItemName = Model.FilterLinkItemName
+
+                    })">@Model.TotalPages</a></li>
+                }
+
+                <li class="@(Model.HasNextPage ? "" : "disabled")">
+                    @if (Model.HasNextPage)
+                    {
+                        <a href="@Url.Action("Index", new {
+                            SearchText = Model.SearchText,
+                            PageSize = Model.PageSize,
+                            SortColumn = Model.SortColumn,
+                            SortDirection = Model.SortDirection,
+                            PageNumber = Model.PageNumber + 1,
+                            FilterReportId = Model.FilterReportId,
+                            FilterLinkItemName = Model.FilterLinkItemName
+
+                        })">Next</a>
+                    }
+                    else
+                    {
+                        <span>Next</span>
+                    }
+                </li>
+            </ul>
+        </nav>
+    </div>
+</div>
+
+</div>
+
+@section scripts {
+<script>
+    var datatypeOptions = @Html.Raw(Json.Encode(ViewBag.DatatypeOptions));
+    var displayIdCounter = @(ViewBag.NextIdentity ?? 1);
+    var saveChangesUrl = '@Url.Action("SaveChanges", "ReportFilteringColumn")';
+    var deleteUrl = '@Url.Action("Delete", "ReportFilteringColumn")';
+    var auditUrl = '@Url.Action("GetAuditLogs", "AuditTrail")';
+    var auditViewUrl = '@Url.Action("AuditLogs", "AuditTrail")';
+    var deletedRecordsUrl = '@Url.Action("DeletedRecords", "AuditTrail")';
+    var filterLinkItemName = '@Model.FilterLinkItemName';
+    var filterReportId = @Model.FilterReportId;
+    var tableName = '@ViewBag.TableName';
+    var auditTableName = '@ViewBag.AuditTableName';
+    var recordIdLabel = '@ViewBag.RecordIdLabel';
+    var colspan = @ViewBag.Colspan;
+</script>
+<script src="~/js/ReportFilteringColumn.js"></script>
+}

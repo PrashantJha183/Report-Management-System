@@ -1,0 +1,28 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.cache
+*.log
+*.tmp
+*.temp
+*.bak
+
+# Build output
+obj/
+bin/Report.dll
+bin/Report.pdb
+bin/Report.dll.config
+
+# Runtime folders
+App_Data/ErrorLogs/
+App_Data/QueryLogs/
+
+# Junk files
+Temp.txt
+bin.zip
+UpgradeLog*.htm
+*.nupkg
+
+# Sensitive config
+App_Data/DbConnection.xml

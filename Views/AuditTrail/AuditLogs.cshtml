@@ -1,0 +1,141 @@
+@model List<Report.Models.AuditLog>
+@using Newtonsoft.Json.Linq
+
+@{
+    Layout = null;
+}
+
+@functions {
+    string FormatJson(string raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return "(empty)";
+        try
+        {
+            var token = JToken.Parse(raw);
+            return token.ToString(Newtonsoft.Json.Formatting.Indented);
+        }
+        catch
+        {
+            return raw;
+        }
+    }
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:"Manrope","Inter",sans-serif; font-size:13px; color:#0f172a; padding:12px; overflow-y:scroll; }
+        h4 { font-size:14px; margin-bottom:10px; color:#1a1a2e; }
+        table { width:100%; border-collapse:collapse; border:1px solid #cbd5e1; font-size:13px; color:#0f172a; }
+        th { padding:10px 8px !important; background:#f8fafc !important; color:#475569; border:1px solid #cbd5e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:0.06em; position:sticky; top:0; }
+        th:last-child { border-right:0 !important; }
+        td { padding:10px 8px !important; vertical-align:middle !important; background:#fff; border:1px solid #cbd5e1; color:#1e293b; }
+        td:last-child { border-right:0 !important; }
+        tr:last-child td { border-bottom:0 !important; }
+        tr:nth-child(even) td { background:#fbfdff !important; }
+        tr:hover td { background:#eef6ff !important; }
+        .label { display:inline-block; padding:2px 6px; border-radius:3px; font-size:10px; font-weight:600; }
+        .label-danger { background:#fce4e4; color:#c0392b; }
+        .label-warning { background:#fff3cd; color:#856404; }
+        pre { background:#f8f8f8; padding:6px 8px; border-radius:3px; font-size:11px; line-height:1.5; white-space:pre; word-break:keep-all; overflow:visible; }
+        .empty { text-align:center; padding:30px; color:#999; font-size:13px; }
+    </style>
+</head>
+<body>
+    <h4>@(ViewBag.Heading ?? "Change History")</h4>
+    @if (!string.IsNullOrEmpty(ViewBag.AlertName) || !string.IsNullOrEmpty(ViewBag.LinkItemName) || ViewBag.RecordId != null)
+    {
+        <div style="margin-bottom:12px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; color:#1e293b; line-height:1.8;">
+            @if (!string.IsNullOrEmpty(ViewBag.AlertName))
+            {
+                <div><strong style="color:#475569; margin-right:6px;">Alert Name:</strong> @ViewBag.AlertName</div>
+            }
+            @if (!string.IsNullOrEmpty(ViewBag.LinkItemName))
+            {
+                <div><strong style="color:#475569; margin-right:6px;">Link Item Name:</strong> @ViewBag.LinkItemName</div>
+            }
+            @if (ViewBag.RecordId != null)
+            {
+                <div><strong style="color:#475569; margin-right:6px;">@(ViewBag.RecordIdLabel ?? "Report ID"):</strong> @ViewBag.RecordId</div>
+            }
+        </div>
+    }
+    @if (ViewBag.Error != null)
+    {
+        <div class="empty">Error: @ViewBag.Error</div>
+    }
+    else if (Model == null || Model.Count == 0)
+    {
+        <div class="empty">No change history found.</div>
+    }
+    else
+    {
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:30px">#</th>
+                    <th style="width:130px">Date &amp; Time</th>
+                    <th style="width:60px">Action</th>
+                    <th style="width:90px">Record ID</th>
+                    @if (ViewBag.Heading == "Deleted Records") { <th style="width:auto">Link Item</th> }
+                    <th>Old Value (JSON)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < Model.Count; i++)
+                {
+                    var log = Model[i];
+                    var labelClass = log.OperationType == "DELETE" ? "label-danger" : "label-warning";
+                    <tr>
+                        <td>@(i + 1)</td>
+                        <td>@log.CreatedOn.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td><span class="label @labelClass">@log.OperationType</span></td>
+                        <td>@log.RecordId</td>
+                        @if (ViewBag.Heading == "Deleted Records") { <td>@(!string.IsNullOrEmpty(log.LinkItemName) ? log.LinkItemName : "-")</td> }
+                        <td><pre>@FormatJson(log.OldValues)</pre></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div style="display:flex; justify-content:center; align-items:center; gap:4px; margin-top:12px; font-size:13px;">
+            @if (ViewBag.TotalPages > 1)
+            {
+                var currentPage = ViewBag.PageNumber;
+                var totalPages = ViewBag.TotalPages;
+                var pageSize = ViewBag.PageSize;
+                var queryParams = ViewBag.Heading == "Deleted Records"
+                    ? "tableName=" + Request.QueryString["tableName"] + "&pageSize=" + pageSize
+                    : "tableName=" + Request.QueryString["tableName"] + "&recordId=" + Request.QueryString["recordId"]
+                      + "&linkItemName=" + Request.QueryString["linkItemName"]
+                      + "&alertName=" + Request.QueryString["alertName"]
+                      + "&recordIdLabel=" + Request.QueryString["recordIdLabel"]
+                      + "&pageSize=" + pageSize;
+
+                if (currentPage > 1)
+                {
+                    <a href="?@queryParams&page=@(currentPage - 1)" style="padding:4px 8px; border:1px solid #cbd5e1; border-radius:3px; text-decoration:none; color:#1e293b; background:#fff;">&laquo;</a>
+                }
+
+                for (int p = 1; p <= totalPages; p++)
+                {
+                    if (p == currentPage)
+                    {
+                        <span style="padding:4px 10px; border:1px solid #1a1a2e; border-radius:3px; background:#1a1a2e; color:#fff; font-weight:700;">@p</span>
+                    }
+                    else
+                    {
+                        <a href="?@queryParams&page=@p" style="padding:4px 10px; border:1px solid #cbd5e1; border-radius:3px; text-decoration:none; color:#1e293b; background:#fff;">@p</a>
+                    }
+                }
+
+                if (currentPage < totalPages)
+                {
+                    <a href="?@queryParams&page=@(currentPage + 1)" style="padding:4px 8px; border:1px solid #cbd5e1; border-radius:3px; text-decoration:none; color:#1e293b; background:#fff;">&raquo;</a>
+                }
+            }
+        </div>
+    }
+</body>
+</html>
