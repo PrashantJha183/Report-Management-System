@@ -155,7 +155,10 @@
                             <td>@(item.IsDisable.HasValue ? (item.IsDisable.Value ? "1" : "0") : "")</td>
                             <td class="action-cell">
                                 <button type="button" class="btn btn-xs btn-primary btn-edit">Edit</button>
-                                <button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>
+                                @if (Session["Role"]?.ToString() == "SuperAdmin")
+                                {
+                                    <button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>
+                                }
                                 <button type="button" class="btn btn-xs btn-info btn-view-repfiltercol-audit" data-table="@ViewBag.AuditTableName" data-id="@item.ReportFilterColumnId" data-linkitemname="@Model.FilterLinkItemName" style="margin-left:3px;">View</button>
                             </td>
                         </tr>
@@ -343,6 +346,7 @@
     var datatypeOptions = @Html.Raw(Json.Encode(ViewBag.DatatypeOptions));
     var displayIdCounter = @(ViewBag.NextIdentity ?? 1);
     var saveChangesUrl = '@Url.Action("SaveChanges", "ReportFilteringColumn")';
+    var currentUserRole = '@Session["Role"]';
     var deleteUrl = '@Url.Action("Delete", "ReportFilteringColumn")';
     var auditUrl = '@Url.Action("GetAuditLogs", "AuditTrail")';
     var auditViewUrl = '@Url.Action("AuditLogs", "AuditTrail")';

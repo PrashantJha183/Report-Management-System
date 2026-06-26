@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Roles>
+  <Role>
+    <Name>SuperAdmin</Name>
+  </Role>
+
+  <Role>
+    <Name>Database Administrator</Name>
+    <Permissions>
+      <Permission>Report.Index</Permission>
+      <Permission>Report.SaveChanges</Permission>
+      <Permission>ReportColumn.Index</Permission>
+      <Permission>ReportColumn.SaveChanges</Permission>
+      <Permission>ReportFilteringColumn.Index</Permission>
+      <Permission>ReportFilteringColumn.SaveChanges</Permission>
+      <Permission>AlertConfig.Index</Permission>
+      <Permission>AlertConfig.SaveChanges</Permission>
+      <Permission>AlertSchedule.Index</Permission>
+      <Permission>AlertSchedule.SaveChanges</Permission>
+      <Permission>AlertConfigAttachment.Index</Permission>
+      <Permission>AlertConfigAttachment.SaveChanges</Permission>
+      <Permission>CompanyConfig.Index</Permission>
+      <Permission>CompanyConfig.SaveChanges</Permission>
+      <Permission>AuditTrail.GetAuditLogs</Permission>
+      <Permission>AuditTrail.AuditLogs</Permission>
+      <Permission>AuditTrail.DeletedRecords</Permission>
+    </Permissions>
+  </Role>
+</Roles>

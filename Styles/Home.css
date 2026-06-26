@@ -1,0 +1,294 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Manrope", "Inter", sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f766e 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+body::before {
+    content: '';
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    background: rgba(15, 118, 110, 0.15);
+    top: -200px;
+    right: -200px;
+}
+
+body::after {
+    content: '';
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    background: rgba(15, 118, 110, 0.1);
+    bottom: -100px;
+    left: -100px;
+}
+
+.login-card {
+    background: rgba(255, 255, 255, 0.97);
+    border-radius: 20px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+    padding: 48px 40px 40px;
+    width: 420px;
+    position: relative;
+    z-index: 1;
+    backdrop-filter: blur(20px);
+}
+
+.login-card .avatar {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #0f766e, #115e59);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+}
+
+.login-card .avatar svg {
+    width: 32px;
+    height: 32px;
+    fill: #fff;
+}
+
+.login-card h2 {
+    font-weight: 800;
+    font-size: 22px;
+    color: #0f172a;
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.login-card .subtitle {
+    text-align: center;
+    color: #64748b;
+    font-size: 14px;
+    margin-bottom: 28px;
+}
+
+.login-card .form-label {
+    font-weight: 600;
+    font-size: 13px;
+    color: #334155;
+    margin-bottom: 4px;
+}
+
+.login-card .form-control {
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 11px 16px;
+    font-size: 14px;
+    color: #0f172a;
+    background: #f8fafc;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    height: auto;
+}
+
+.login-card .form-control:focus {
+    border-color: #0f766e;
+    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+    background: #fff;
+}
+
+.login-card .password-wrapper {
+    position: relative;
+}
+
+.login-card .password-wrapper .form-control {
+    padding-right: 44px;
+}
+
+.login-card .toggle-pw {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: #94a3b8;
+    line-height: 0;
+    transition: color 0.2s;
+}
+
+.login-card .toggle-pw:hover {
+    color: #0f766e;
+}
+
+.login-card .toggle-pw svg {
+    width: 20px;
+    height: 20px;
+}
+
+.login-card .btn-primary {
+    background: #0f766e;
+    border: none;
+    font-weight: 700;
+    font-size: 15px;
+    padding: 12px;
+    width: 100%;
+    border-radius: 10px;
+    margin-top: 4px;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.login-card .btn-primary:hover {
+    background: #115e59;
+    transform: translateY(-1px);
+}
+
+.login-card .btn-primary:active {
+    transform: translateY(0);
+}
+
+.alert-danger {
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    margin-bottom: 20px;
+}
+
+/* ── Custom DB Dropdown ── */
+
+.db-select {
+    position: relative;
+}
+
+.db-select .db-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 16px;
+    font-size: 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+    text-align: left;
+}
+
+.db-select .db-toggle:hover {
+    border-color: #cbd5e1;
+}
+
+.db-select .db-toggle:focus {
+    outline: none;
+    border-color: #0f766e;
+    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+    background: #fff;
+}
+
+.db-select .db-toggle.selected {
+    color: #0f172a;
+}
+
+.db-select .db-toggle .arrow {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    transition: transform 0.3s ease;
+    color: #94a3b8;
+}
+
+.db-select .db-toggle .arrow.open {
+    transform: rotate(180deg);
+}
+
+.db-select .db-panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.25s ease, margin 0.3s ease;
+    z-index: 10;
+    margin-top: -4px;
+}
+
+.db-select .db-panel.open {
+    max-height: 260px;
+    opacity: 1;
+    margin-top: 0;
+    overflow-y: auto;
+}
+
+.db-select .db-panel .db-option {
+    padding: 10px 16px;
+    font-size: 14px;
+    color: #334155;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.db-select .db-panel .db-option:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.db-select .db-panel .db-option.selected {
+    color: #0f766e;
+    font-weight: 600;
+}
+
+.db-select .db-panel .db-option .check {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.db-select .db-panel .db-option.selected .check {
+    opacity: 1;
+}
+
+.form-control.error,
+.db-select .db-toggle.error {
+    border-color: #f87171;
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.15);
+    animation: shake 0.4s ease;
+}
+
+.error-message {
+    font-size: 12px;
+    color: #dc2626;
+    margin-top: 4px;
+    display: none;
+    align-items: center;
+    gap: 4px;
+}
+
+.error-message.visible {
+    display: flex;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+}

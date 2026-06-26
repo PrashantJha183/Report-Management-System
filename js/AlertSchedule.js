@@ -294,7 +294,7 @@ $('#btnAddRow').on('click', function () {
         '<td class="email-cell"></td>' +
         '<td class="action-cell">' +
         '<button type="button" class="btn btn-xs btn-primary btn-edit">Edit</button>' +
-        '<button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>' +
+        (currentUserRole === 'SuperAdmin' ? '<button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>' : '') +
         '<button type="button" class="btn btn-xs btn-info btn-view-alert-audit" data-table="' + window.auditTableName + '" data-id="' + (window.filterAlertConfigId || tempId) + '" style="margin-left:3px;">View</button>' +
         '</td>';
 

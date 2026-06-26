@@ -151,7 +151,10 @@
                                                 onclick="window.location='@Url.Action("Index", "ReportFilteringColumn", new { FilterReportId = item.ReportId, FilterLinkItemName = item.ReferenceLinkName })'" style="margin-right:3px;">
                                             Report Filtering Column
                                         </button>
-                                        <button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>
+                                        @if (Session["Role"]?.ToString() == "SuperAdmin")
+                                        {
+                                            <button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>
+                                        }
                                         <button type="button" class="btn btn-xs btn-info btn-view-audit" data-table="@ViewBag.AuditTableName" data-id="@item.ReportId" data-linkitemname="@item.ReferenceLinkName" style="margin-left:3px;">View</button>
                                         <button type="button" class="btn btn-xs btn-primary btn-edit" style="margin-left:3px;">Edit</button>
                                     </td>
@@ -374,6 +377,7 @@
         var saveChangesUrl = '@Url.Action("SaveChanges", "Report")';
         var reportColumnUrl = '@Url.Action("Index", "ReportColumn")';
         var reportFilteringColumnUrl = '@Url.Action("Index", "ReportFilteringColumn")';
+        var currentUserRole = '@Session["Role"]';
         var deleteUrl = '@Url.Action("Delete", "Report")';
         var auditUrl = '@Url.Action("GetAuditLogs", "AuditTrail")';
         var auditViewUrl = '@Url.Action("AuditLogs", "AuditTrail")';

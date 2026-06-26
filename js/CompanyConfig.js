@@ -205,9 +205,13 @@ $('#saveConfirmOk').on('click', function () {
                                 $dataRow.attr('data-companyconfigid', realId);
                                 $dataRow.data('companyconfigid', realId);
                                 result.companyConfigId = realId;
+                                var deleteBtnHtml = '';
+                                if (currentUserRole === 'SuperAdmin') {
+                                    deleteBtnHtml = '<button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>';
+                                }
                                 $dataRow.find('.action-cell').html(
                                     '<button type="button" class="btn btn-xs btn-primary btn-edit">Edit</button>' +
-                                    '<button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>' +
+                                    deleteBtnHtml +
                                     '<button type="button" class="btn btn-xs btn-info btn-view-companyconfig-audit" data-table="' + window.auditTableName + '" data-id="' + realId + '" data-code="' + $('<div>').text($dataRow.data('code') || '').html() + '" style="margin-left:3px;">View</button>'
                                 );
                             }
@@ -303,7 +307,7 @@ $('#btnAddRow').on('click', function () {
         '<td class="wrap-cell"></td>' +
         '<td class="action-cell">' +
         '<button type="button" class="btn btn-xs btn-primary btn-edit">Edit</button>' +
-        '<button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>' +
+        (currentUserRole === 'SuperAdmin' ? '<button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>' : '') +
         '<button type="button" class="btn btn-xs btn-info btn-view-companyconfig-audit" data-table="' + window.auditTableName + '" data-id="' + tempId + '" data-code="" style="margin-left:3px;">View</button>' +
         '</td>';
 

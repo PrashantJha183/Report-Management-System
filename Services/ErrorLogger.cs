@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Web;
 using System.Xml;
 
 namespace Report.Services
@@ -17,6 +18,9 @@ namespace Report.Services
                     DateTime.UtcNow,
                     TimeZoneInfo.FindSystemTimeZoneById("India Standard Time"));
 
+                var username = HttpContext.Current?.Session["Username"]?.ToString() ?? "unknown";
+                var companyCode = HttpContext.Current?.Session["CompanyCode"]?.ToString() ?? "unknown";
+
                 var baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 var logDir = Path.Combine(baseDir, "App_Data", "ErrorLogs");
                 Directory.CreateDirectory(logDir);
@@ -31,7 +35,7 @@ namespace Report.Services
                         var insertPos = content.LastIndexOf("</ErrorLogs>", StringComparison.Ordinal);
                         if (insertPos >= 0)
                         {
-                            var entry = $"  <Log Time=\"{ist:yyyy-MM-dd HH:mm:ss}\">\n" +
+                            var entry = $"  <Log Time=\"{ist:yyyy-MM-dd HH:mm:ss}\" User=\"{username}\" Database=\"{companyCode}\">\n" +
                                         $"    <Message><![CDATA[{ex.Message}]]></Message>\n" +
                                         $"    <StackTrace><![CDATA[{ex.StackTrace}]]></StackTrace>\n" +
                                         $"    <Query><![CDATA[{query}]]></Query>\n" +
@@ -53,6 +57,8 @@ namespace Report.Services
 
                             writer.WriteStartElement("Log");
                             writer.WriteAttributeString("Time", $"{ist:yyyy-MM-dd HH:mm:ss}");
+                            writer.WriteAttributeString("User", username);
+                            writer.WriteAttributeString("Database", companyCode);
 
                             writer.WriteStartElement("Message");
                             writer.WriteCData(ex.Message);

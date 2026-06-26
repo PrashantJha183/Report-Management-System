@@ -78,6 +78,7 @@
                     <th style="width:30px">#</th>
                     <th style="width:130px">Date &amp; Time</th>
                     <th style="width:60px">Action</th>
+                    @if (Session["Role"]?.ToString() == "SuperAdmin") { <th style="width:120px">Created By</th> }
                     <th style="width:90px">Record ID</th>
                     @if (ViewBag.Heading == "Deleted Records") { <th style="width:auto">Link Item</th> }
                     <th>Old Value (JSON)</th>
@@ -92,6 +93,7 @@
                         <td>@(i + 1)</td>
                         <td>@log.CreatedOn.ToString("yyyy-MM-dd HH:mm:ss")</td>
                         <td><span class="label @labelClass">@log.OperationType</span></td>
+                        @if (Session["Role"]?.ToString() == "SuperAdmin") { <td>@(string.IsNullOrEmpty(log.CreatedBy) ? "-" : log.CreatedBy)</td> }
                         <td>@log.RecordId</td>
                         @if (ViewBag.Heading == "Deleted Records") { <td>@(!string.IsNullOrEmpty(log.LinkItemName) ? log.LinkItemName : "-")</td> }
                         <td><pre>@FormatJson(log.OldValues)</pre></td>

@@ -179,6 +179,9 @@
     <Compile Include="Models\ComMstReportColumn.cs" />
     <Compile Include="Models\comMstReportFilteringColumn.cs" />
     <Compile Include="Models\ComMstCompanyConfig.cs" />
+    <Compile Include="Models\ComMstRole.cs" />
+    <Compile Include="Models\ComMstUser.cs" />
+    <Compile Include="Models\ConnectionInfo.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Services\AlertConfigAttachmentService.cs" />
     <Compile Include="Services\AuditLogService.cs" />
@@ -194,6 +197,8 @@
     <Compile Include="Services\ReportFilteringColumnService.cs" />
     <Compile Include="Services\ServiceHelper.cs" />
     <Compile Include="Services\CompanyConfigService.cs" />
+    <Compile Include="Services\RoleService.cs" />
+    <Compile Include="Services\UserService.cs" />
     <Content Include="js\AlertConfig.js" />
     <Content Include="js\AlertConfigAttachment.js" />
     <Content Include="js\AlertSchedule.js" />
@@ -201,11 +206,13 @@
     <Content Include="js\ReportFilteringColumn.js" />
     <Content Include="js\ReportMaster.js" />
     <Content Include="js\CompanyConfig.js" />
+    <Content Include="js\Home.js" />
     <Content Include="Styles\AlertConfig.css" />
     <Content Include="Styles\AlertConfigAttachment.css" />
     <Content Include="Styles\AlertSchedule.css" />
     <Content Include="Styles\ReportColumn.css" />
     <Content Include="Styles\ReportFilteringColumn.css" />
+    <Content Include="Styles\Home.css" />
     <Content Include="Views\AlertConfigAttachment\Index.cshtml" />
     <None Include="Views\AlertConfig\Index.cshtml" />
     <Content Include="Views\AlertSchedule\Index.cshtml" />
@@ -213,6 +220,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="App_Data\DbConnection.xml" />
+    <Content Include="App_Data\Users.xml" />
+    <Content Include="App_Data\Roles.xml" />
     <Content Include="Content\bootstrap-theme.css" />
     <Content Include="Content\bootstrap-theme.min.css" />
     <Content Include="Content\bootstrap.css" />

@@ -5,6 +5,7 @@ using System.Data;
 using System.Data.Common;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 using Newtonsoft.Json.Linq;
 
 namespace Report.Services
@@ -26,6 +27,9 @@ namespace Report.Services
         {
             if (oldValues == null)
                 return;
+
+            if (string.IsNullOrEmpty(createdBy))
+                createdBy = HttpContext.Current?.Session["Username"]?.ToString();
 
             var sql = new StringBuilder();
             sql.Append($"INSERT INTO {ReportConfig.AuditLogTable} (TableName, RecordId, OperationType, OldValues, CreatedOn, CreatedBy) ");

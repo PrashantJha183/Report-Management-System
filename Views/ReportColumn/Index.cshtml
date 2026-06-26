@@ -93,7 +93,10 @@
                             <td>@item.TableColumnName</td>
                             <td class="action-cell">
                                 <button type="button" class="btn btn-xs btn-primary btn-edit">Edit</button>
-                                <button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>
+                                @if (Session["Role"]?.ToString() == "SuperAdmin")
+                                {
+                                    <button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>
+                                }
                                 <button type="button" class="btn btn-xs btn-info btn-view-reportcol-audit" data-table="@ViewBag.AuditTableName" data-id="@item.ReportColumnId" data-linkitemname="@Model.FilterLinkItemName" style="margin-left:3px;">View</button>
                             </td>
                         </tr>
@@ -372,6 +375,7 @@
     var datatypeOptions = @Html.Raw(Json.Encode(ViewBag.DatatypeOptions));
     var displayIdCounter = @(ViewBag.NextIdentity ?? 1);
     var saveChangesUrl = '@Url.Action("SaveChanges", "ReportColumn")';
+    var currentUserRole = '@Session["Role"]';
     var deleteUrl = '@Url.Action("Delete", "ReportColumn")';
     var auditUrl = '@Url.Action("GetAuditLogs", "AuditTrail")';
     var auditViewUrl = '@Url.Action("AuditLogs", "AuditTrail")';

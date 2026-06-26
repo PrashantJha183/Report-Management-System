@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Users>
+  <User>
+    <UserId>1</UserId>
+    <Username>superadmin</Username>
+    <Password>superadmin</Password>
+    <DisplayName>Super Admin</DisplayName>
+    <Role>SuperAdmin</Role>
+    <IsActive>true</IsActive>
+    <CreatedOn>2026-06-26</CreatedOn>
+  </User>
+  <User>
+    <UserId>2</UserId>
+    <Username>prashant</Username>
+    <Password>prashant9</Password>
+    <DisplayName>Database Administrator</DisplayName>
+    <Role>Database Administrator</Role>
+    <IsActive>true</IsActive>
+    <CreatedOn>2026-06-26</CreatedOn>
+  </User>
+</Users>

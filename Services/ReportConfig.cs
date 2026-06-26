@@ -1,5 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
 using System.Web.Configuration;
+using System.Xml.Linq;
+using Report.Models;
 
 namespace Report.Services
 {
@@ -59,6 +64,23 @@ namespace Report.Services
                 return $"SELECT {aggregateExpression} FROM {tableName} FOR UPDATE";
             else
                 return $"SELECT {aggregateExpression} FROM {tableName} WITH (TABLOCKX, HOLDLOCK)";
+        }
+
+        public static List<ConnectionInfo> GetAllConnections()
+        {
+            var configPath = DbConnectionConfigPath;
+            var path = HttpContext.Current.Server.MapPath(configPath);
+            var doc = XDocument.Load(path);
+            var connections = doc.Root?.Element("Connections")?.Elements("Connection");
+
+            if (connections == null) return new List<ConnectionInfo>();
+
+            return connections.Select(c => new ConnectionInfo
+            {
+                Name = (string)c.Element("Name"),
+                ConnectionString = (string)c.Element("ConnectionString"),
+                DbType = (string)c.Element("DbType")
+            }).ToList();
         }
     }
 }

@@ -161,7 +161,10 @@
                             <td class="email-cell" title="@item.CCEmail">@item.CCEmail</td>
                             <td class="action-cell">
                                 <button type="button" class="btn btn-xs btn-primary btn-edit">Edit</button>
-                                <button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>
+                                @if (Session["Role"]?.ToString() == "SuperAdmin")
+                                {
+                                    <button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>
+                                }
                                 <button type="button" class="btn btn-xs btn-info btn-view-alert-audit" data-table="@ViewBag.AuditTableName" data-id="@item.AlertConfigId" style="margin-left:3px;">View</button>
                             </td>
                         </tr>
@@ -325,6 +328,7 @@
         var displayIdCounter = @(ViewBag.NextIdentity ?? 1);
         var saveChangesUrl = '@Url.Action("SaveChanges", "AlertSchedule")';
         var filterAlertConfigId = @Model.FilterAlertConfigId;
+        var currentUserRole = '@Session["Role"]';
         var deleteUrl = '@Url.Action("Delete", "AlertSchedule")';
         var auditUrl = '@Url.Action("GetAuditLogs", "AuditTrail")';
         var auditViewUrl = '@Url.Action("AuditLogs", "AuditTrail")';

@@ -137,7 +137,10 @@
                             <td class="wrap-cell" title="@item.Description">@item.Description</td>
                             <td class="action-cell">
                                 <button type="button" class="btn btn-xs btn-primary btn-edit">Edit</button>
-                                <button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>
+                                @if (Session["Role"]?.ToString() == "SuperAdmin")
+                                {
+                                    <button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>
+                                }
                                 <button type="button" class="btn btn-xs btn-info btn-view-companyconfig-audit" data-table="@ViewBag.AuditTableName" data-id="@item.CompanyConfigId" data-code="@item.Code" style="margin-left:3px;">View</button>
                             </td>
                         </tr>
@@ -280,6 +283,7 @@
     <script>
         var displayIdCounter = @(ViewBag.NextIdentity ?? 1);
         var saveChangesUrl = '@Url.Action("SaveChanges", "CompanyConfig")';
+        var currentUserRole = '@Session["Role"]';
         var deleteUrl = '@Url.Action("Delete", "CompanyConfig")';
         var auditUrl = '@Url.Action("GetAuditLogs", "AuditTrail")';
         var auditViewUrl = '@Url.Action("AuditLogs", "AuditTrail")';

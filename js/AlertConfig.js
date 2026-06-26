@@ -214,11 +214,15 @@ $('#saveConfirmOk').on('click', function () {
                                 $dataRow.attr('data-alertconfigid', realId);
                                 $dataRow.data('alertconfigid', realId);
                                 result.alertConfigId = realId;
+                                var deleteBtnHtml = '';
+                                if (currentUserRole === 'SuperAdmin') {
+                                    deleteBtnHtml = '<button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>';
+                                }
                                 $dataRow.find('.action-cell').html(
                                     '<button type="button" class="btn btn-xs btn-primary" onclick="window.location=\'' + scheduleUrl + '?FilterAlertConfigId=' + realId + '\'" style="margin-right:3px;background:#0891b2!important;border-color:#06b6d4!important;color:#fff!important;font-weight:800;border-radius:6px!important;padding:6px 8px;font-size:11px;">Schedule</button>' +
                                     '<button type="button" class="btn btn-xs btn-primary" onclick="window.location=\'' + attachmentUrl + '?FilterAlertConfigId=' + realId + '\'" style="margin-right:3px;background:#d97706!important;border-color:#d97706!important;color:#fff!important;font-weight:800;border-radius:6px!important;padding:6px 8px;font-size:11px;">Attachment</button>' +
                                     '<button type="button" class="btn btn-xs btn-primary btn-edit">Edit</button>' +
-                                    '<button type="button" class="btn btn-xs btn-danger btn-delete" style="margin-left:3px;">Delete</button>' +
+                                    deleteBtnHtml +
                                     '<button type="button" class="btn btn-xs btn-info btn-view-alert-audit" data-table="' + window.auditTableName + '" data-id="' + realId + '" data-alertname="' + $('<div>').text($dataRow.data('alertname') || '').html() + '" style="margin-left:3px;">View</button>'
                                 );
                             }
@@ -419,4 +423,32 @@ $(function () {
         }, 500);
     });
 
+});
+
+$(document).on('click', '.btn-view-alert-audit', function () {
+    var $wrapper = $('#tableWrapper');
+    var $panel = $('#auditPanel');
+    var recordId = $(this).data('id');
+    var tableName = $(this).data('table');
+    var src = (window.auditViewUrl || '/AuditTrail/AuditLogs') + '?tableName=' + encodeURIComponent(tableName) + '&recordId=' + encodeURIComponent(recordId) + '&recordIdLabel=' + encodeURIComponent(window.recordIdLabel) + '&alertName=' + encodeURIComponent($(this).data('alertname') || '');
+    $('#auditPanelTitle').text('Change History');
+    $('#auditIframe').attr('src', src);
+    $wrapper.css('flex', '1 1 50%');
+    $panel.show();
+});
+
+$('#btnDeletedRecords').on('click', function () {
+    var $wrapper = $('#tableWrapper');
+    var $panel = $('#auditPanel');
+    var src = (window.deletedRecordsUrl || '/AuditTrail/DeletedRecords') + '?tableName=' + encodeURIComponent(window.tableName);
+    $('#auditPanelTitle').text('Deleted Records');
+    $('#auditIframe').attr('src', src);
+    $wrapper.css('flex', '1 1 50%');
+    $panel.show();
+});
+
+$('#btnCloseAudit').on('click', function () {
+    $('#tableWrapper').css('flex', '1 1 100%');
+    $('#auditPanel').hide();
+    $('#auditIframe').attr('src', '');
 });
