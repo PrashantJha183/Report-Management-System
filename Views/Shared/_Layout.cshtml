@@ -93,13 +93,82 @@
             color: #fff;
             background: #dc2626;
         }
+
+        .navbar-collapse.collapse {
+            display: flex !important;
+            flex-direction: row;
+            align-items: center;
+            flex-wrap: nowrap;
+        }
+
+        .nav-left-group {
+            display: flex !important;
+            align-items: center;
+            flex: 1;
+            flex-wrap: nowrap;
+        }
+
+        .nav-right-group {
+            display: flex !important;
+            align-items: center;
+            gap: 18px;
+            margin-left: auto;
+            flex-wrap: nowrap;
+            padding-left: 20px;
+        }
+
+        .nav-info-item {
+            padding: 0 !important;
+            font-size: 13px;
+            color: #334155;
+            white-space: nowrap;
+            display: flex !important;
+            align-items: center;
+        }
+
+        .nav-icon {
+            margin-right: 5px;
+            font-size: 14px;
+            color: #0f766e;
+        }
+
+        .nav-label {
+            font-weight: 700;
+        }
+
+        .btn-change-pw-nav {
+            background: #0f766e !important;
+            color: #fff !important;
+            font-size: 11px !important;
+            font-weight: 800 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.04em !important;
+            padding: 6px 14px !important;
+            border-radius: 8px !important;
+            border: none !important;
+            text-decoration: none !important;
+            display: inline-block;
+            transition: background 0.15s ease;
+        }
+
+        .btn-change-pw-nav:hover {
+            background: #115e59 !important;
+            color: #fff !important;
+            text-decoration: none !important;
+        }
+
+        .nav-logout-form {
+            margin: 0;
+            padding: 0;
+            display: inline;
+        }
     </style>
 </head>
 <body>
     @if (Session["IsLoggedIn"] != null && (bool)Session["IsLoggedIn"])
     {
     <div class="navbar navbar-inverse navbar-fixed-top">
-        <div class="container">
+        <div class="container-fluid">
             <div class="navbar-header">
                 <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
                     <span class="icon-bar"></span>
@@ -107,8 +176,8 @@
                     <span class="icon-bar"></span>
                 </button>
             </div>
-            <div class="navbar-collapse collapse">
-                <ul class="nav navbar-nav">
+                <div class="navbar-collapse collapse">
+                <ul class="nav navbar-nav nav-left-group">
                     <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "Report" ? "active" : "")">
                         @Html.ActionLink("Report Master", "Index", "Report")
                     </li>
@@ -118,15 +187,27 @@
                     <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "AlertConfig" ? "active" : "")">
                         @Html.ActionLink("Alert Config", "Index", "AlertConfig")
                     </li>
+                    @if (Session["Role"]?.ToString() == "SuperAdmin")
+                    {
+                        <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "User" ? "active" : "")">
+                            @Html.ActionLink("User Master", "Index", "User")
+                        </li>
+                    }
                 </ul>
-                <ul class="nav navbar-nav navbar-right">
-                    <li style="padding:14px 12px;font-size:13px;color:#334155;white-space:nowrap;">
-                        <span style="font-weight:700;margin-right:6px;">@Session["Username"]</span>
-                        <span style="color:#94a3b8;">|</span>
-                        <span style="margin-left:6px;">@Session["CompanyCode"]</span>
+                <ul class="nav navbar-nav nav-right-group">
+                    <li class="nav-info-item">
+                        <span class="glyphicon glyphicon-user nav-icon"></span>
+                        <span class="nav-label">@Session["Username"]</span>
+                    </li>
+                    <li class="nav-info-item">
+                        <span class="glyphicon glyphicon-hdd nav-icon"></span>
+                        <span class="nav-label">@Session["CompanyCode"]</span>
                     </li>
                     <li>
-                        <form method="post" action="@Url.Action("Logout", "Home")" style="margin:0;padding:0;display:inline">
+                        <a href="@Url.Action("ChangePassword", "Account")" class="btn-change-pw-nav">Change Password</a>
+                    </li>
+                    <li>
+                        <form method="post" action="@Url.Action("Logout", "Home")" class="nav-logout-form">
                             <button type="submit" class="btn-logout">Logout</button>
                         </form>
                     </li>
@@ -143,7 +224,7 @@
     }
     <div class="container-fluid body-content">
         @RenderBody()
-        <hr />
+        @*<hr />*@
     </div>
 
     @Scripts.Render("~/bundles/jquery")

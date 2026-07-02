@@ -160,10 +160,12 @@
     <Compile Include="App_Start\FilterConfig.cs" />
     <Compile Include="App_Start\RouteConfig.cs" />
     <Compile Include="Controllers\AlertConfigAttachmentController.cs" />
+    <Compile Include="Controllers\AccountController.cs" />
     <Compile Include="Controllers\AlertConfigController.cs" />
     <Compile Include="Controllers\AuditTrailController.cs" />
     <Compile Include="Controllers\AlertScheduleController.cs" />
     <Compile Include="Controllers\CompanyConfigController.cs" />
+    <Compile Include="Controllers\UserController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
     <Compile Include="Controllers\ReportColumnController.cs" />
     <Compile Include="Controllers\ReportController.cs" />
@@ -199,6 +201,16 @@
     <Compile Include="Services\CompanyConfigService.cs" />
     <Compile Include="Services\RoleService.cs" />
     <Compile Include="Services\UserService.cs" />
+    <Content Include=".gitignore" />
+    <Content Include="App_Data\DbConnection_log.ldf" />
+    <Content Include="App_Data\ErrorLogs\ErrorLog_2026-06-19.xml" />
+    <Content Include="App_Data\ErrorLogs\ErrorLog_2026-06-20.xml" />
+    <Content Include="App_Data\QueryLogs\QueryLog_2026-06-15.xml" />
+    <Content Include="App_Data\QueryLogs\QueryLog_2026-06-18.xml" />
+    <Content Include="App_Data\QueryLogs\QueryLog_2026-06-19.xml" />
+    <Content Include="App_Data\QueryLogs\QueryLog_2026-06-20.xml" />
+    <Content Include="App_Data\QueryLogs\QueryLog_2026-06-25.xml" />
+    <Content Include="App_Data\QueryLogs\QueryLog_2026-06-26.xml" />
     <Content Include="js\AlertConfig.js" />
     <Content Include="js\AlertConfigAttachment.js" />
     <Content Include="js\AlertSchedule.js" />
@@ -207,16 +219,23 @@
     <Content Include="js\ReportMaster.js" />
     <Content Include="js\CompanyConfig.js" />
     <Content Include="js\Home.js" />
+    <Content Include="js\Account.js" />
+    <Content Include="Styles\Account.css" />
     <Content Include="Styles\AlertConfig.css" />
     <Content Include="Styles\AlertConfigAttachment.css" />
     <Content Include="Styles\AlertSchedule.css" />
     <Content Include="Styles\ReportColumn.css" />
     <Content Include="Styles\ReportFilteringColumn.css" />
     <Content Include="Styles\Home.css" />
+    <Content Include="Views\Account\ChangePassword.cshtml" />
     <Content Include="Views\AlertConfigAttachment\Index.cshtml" />
+    <Content Include="LICENSE" />
+    <Content Include="build.log" />
+    <Content Include="README.md" />
     <None Include="Views\AlertConfig\Index.cshtml" />
     <Content Include="Views\AlertSchedule\Index.cshtml" />
     <Content Include="Views\ReportColumn\Index.cshtml" />
+    <Content Include="Views\AuditTrail\AuditLogs.cshtml" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="App_Data\DbConnection.xml" />
@@ -244,6 +263,9 @@
     <Content Include="Scripts\jquery.validate.unobtrusive.min.js" />
     <Content Include="Scripts\modernizr-2.8.3.js" />
     <Content Include="Styles\CompanyConfig.css" />
+    <Content Include="Styles\UserMaster.css" />
+    <Content Include="js\UserMaster.js" />
+    <Content Include="Views\User\Index.cshtml" />
     <Content Include="Styles\ReportMaster.css" />
     <Content Include="Web.config" />
     <Content Include="Web.Debug.config">

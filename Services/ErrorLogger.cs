@@ -20,6 +20,7 @@ namespace Report.Services
 
                 var username = HttpContext.Current?.Session["Username"]?.ToString() ?? "unknown";
                 var companyCode = HttpContext.Current?.Session["CompanyCode"]?.ToString() ?? "unknown";
+                var tableName = ExtractTableName(query.TrimStart());
 
                 var baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 var logDir = Path.Combine(baseDir, "App_Data", "ErrorLogs");
@@ -36,6 +37,7 @@ namespace Report.Services
                         if (insertPos >= 0)
                         {
                             var entry = $"  <Log Time=\"{ist:yyyy-MM-dd HH:mm:ss}\" User=\"{username}\" Database=\"{companyCode}\">\n" +
+                                        $"    <Table><![CDATA[{tableName}]]></Table>\n" +
                                         $"    <Message><![CDATA[{ex.Message}]]></Message>\n" +
                                         $"    <StackTrace><![CDATA[{ex.StackTrace}]]></StackTrace>\n" +
                                         $"    <Query><![CDATA[{query}]]></Query>\n" +
@@ -60,6 +62,10 @@ namespace Report.Services
                             writer.WriteAttributeString("User", username);
                             writer.WriteAttributeString("Database", companyCode);
 
+                            writer.WriteStartElement("Table");
+                            writer.WriteCData(tableName);
+                            writer.WriteEndElement();
+
                             writer.WriteStartElement("Message");
                             writer.WriteCData(ex.Message);
                             writer.WriteEndElement();
@@ -83,6 +89,32 @@ namespace Report.Services
             {
                 // Silently ignore — never break the calling operation
             }
+        }
+        private static string ExtractTableName(string trimmed)
+        {
+            if (trimmed.StartsWith("INSERT INTO", StringComparison.OrdinalIgnoreCase))
+            {
+                var after = trimmed.Substring("INSERT INTO".Length).TrimStart();
+                var spaceIdx = after.IndexOf(' ');
+                var parenIdx = after.IndexOf('(');
+                var endIdx = spaceIdx > 0 && parenIdx > 0 ? Math.Min(spaceIdx, parenIdx) :
+                             spaceIdx > 0 ? spaceIdx :
+                             parenIdx > 0 ? parenIdx : after.Length;
+                return after.Substring(0, endIdx);
+            }
+            if (trimmed.StartsWith("UPDATE", StringComparison.OrdinalIgnoreCase))
+            {
+                var after = trimmed.Substring("UPDATE".Length).TrimStart();
+                var spaceIdx = after.IndexOf(' ');
+                return spaceIdx > 0 ? after.Substring(0, spaceIdx) : after;
+            }
+            if (trimmed.StartsWith("DELETE FROM", StringComparison.OrdinalIgnoreCase))
+            {
+                var after = trimmed.Substring("DELETE FROM".Length).TrimStart();
+                var spaceIdx = after.IndexOf(' ');
+                return spaceIdx > 0 ? after.Substring(0, spaceIdx) : after;
+            }
+            return "unknown";
         }
     }
 }

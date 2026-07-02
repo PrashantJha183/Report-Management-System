@@ -1,0 +1,86 @@
+@* ============================================
+   _Pagination.cshtml — Shared pagination partial
+   Model: GridViewModelBase (must have PageNumber, TotalPages, TotalRecords,
+          SortColumn, SortDirection, SearchText, PageSize)
+   Usage: @Html.Partial("_Pagination", Model)
+   ============================================ *@
+@model Report.Models.GridViewModelBase
+
+<div class="bottom-bar">
+    <div style="font-size:13px; font-weight:700; color:#475569;">
+        Page @Model.PageNumber of @Model.TotalPages
+        &nbsp;(@Model.TotalRecords records)
+    </div>
+
+    <ul class="pagination pagination-sm">
+        @if (Model.TotalPages > 1)
+        {
+            <li class="@(Model.PageNumber <= 1 ? "disabled" : "")">
+                <a href="@Url.Action("Index", new {
+                    PageNumber = 1,
+                    SortColumn = Model.SortColumn,
+                    SortDirection = Model.SortDirection,
+                    SearchText = Model.SearchText,
+                    PageSize = Model.PageSize
+                })">First</a>
+            </li>
+            <li class="@(Model.PageNumber <= 1 ? "disabled" : "")">
+                <a href="@Url.Action("Index", new {
+                    PageNumber = Model.PageNumber - 1,
+                    SortColumn = Model.SortColumn,
+                    SortDirection = Model.SortDirection,
+                    SearchText = Model.SearchText,
+                    PageSize = Model.PageSize
+                })">‹</a>
+            </li>
+
+            @{
+                int windowStart = Math.Max(1, Model.PageNumber - 2);
+                int windowEnd = Math.Min(Model.TotalPages, Model.PageNumber + 2);
+                if (windowEnd - windowStart < 4)
+                {
+                    if (windowStart == 1)
+                    {
+                        windowEnd = Math.Min(Model.TotalPages, windowStart + 4);
+                    }
+                    else
+                    {
+                        windowStart = Math.Max(1, windowEnd - 4);
+                    }
+                }
+            }
+
+            @for (int i = windowStart; i <= windowEnd; i++)
+            {
+                <li class="@(Model.PageNumber == i ? "active" : "")">
+                    <a href="@Url.Action("Index", new {
+                        PageNumber = i,
+                        SortColumn = Model.SortColumn,
+                        SortDirection = Model.SortDirection,
+                        SearchText = Model.SearchText,
+                        PageSize = Model.PageSize
+                    })">@i</a>
+                </li>
+            }
+
+            <li class="@(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
+                <a href="@Url.Action("Index", new {
+                    PageNumber = Model.PageNumber + 1,
+                    SortColumn = Model.SortColumn,
+                    SortDirection = Model.SortDirection,
+                    SearchText = Model.SearchText,
+                    PageSize = Model.PageSize
+                })">›</a>
+            </li>
+            <li class="@(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
+                <a href="@Url.Action("Index", new {
+                    PageNumber = Model.TotalPages,
+                    SortColumn = Model.SortColumn,
+                    SortDirection = Model.SortDirection,
+                    SearchText = Model.SearchText,
+                    PageSize = Model.PageSize
+                })">Last</a>
+            </li>
+        }
+    </ul>
+</div>

@@ -3,19 +3,34 @@
   <User>
     <UserId>1</UserId>
     <Username>superadmin</Username>
-    <Password>superadmin</Password>
+    <Password>aTU0g17IhXA7yvgfnJDWHCPW6vcFj42k/Do5RiRposg=</Password>
+    <PasswordSalt>VW65AVHVsc6bDZjAev6cuA==</PasswordSalt>
     <DisplayName>Super Admin</DisplayName>
     <Role>SuperAdmin</Role>
     <IsActive>true</IsActive>
     <CreatedOn>2026-06-26</CreatedOn>
+    <PasswordChangedOn>2026-07-01T06:19:56.1977591Z</PasswordChangedOn>
   </User>
   <User>
     <UserId>2</UserId>
     <Username>prashant</Username>
-    <Password>prashant9</Password>
+    <Password>oROiO8uFv7P2Jb+IBkjs9/PPgK7P/6LyWjIXqVaNXug=</Password>
+    <PasswordSalt>UYI1q9FymwcHBtN1pKQMrQ==</PasswordSalt>
     <DisplayName>Database Administrator</DisplayName>
     <Role>Database Administrator</Role>
     <IsActive>true</IsActive>
     <CreatedOn>2026-06-26</CreatedOn>
+    <PasswordChangedOn>2026-07-01T00:00:00.0000000Z</PasswordChangedOn>
+  </User>
+  <User>
+    <UserId>3</UserId>
+    <Username>Riddhi</Username>
+    <Password>kxWtR0+fcoT+BKC3kPTOB47U+bO3yzQDNf/7ONABRQQ=</Password>
+    <DisplayName>Riddhi</DisplayName>
+    <Role>Database Administrator</Role>
+    <IsActive>true</IsActive>
+    <CreatedOn>2026-07-01T10:03:55.5444710Z</CreatedOn>
+    <PasswordSalt>n+TzrvnvHBJZ3GleBO6yZQ==</PasswordSalt>
+    <PasswordChangedOn>2026-07-01T10:03:56.2518684Z</PasswordChangedOn>
   </User>
 </Users>

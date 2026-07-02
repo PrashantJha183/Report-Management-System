@@ -1,0 +1,49 @@
+@* ============================================
+   _GridToolbar.cshtml — Shared grid toolbar partial
+   Model: GridViewModelBase
+   Includes sort direction dropdown, page-size form,
+   and add-row button.
+   Usage: @Html.Partial("_GridToolbar",
+             new ViewDataDictionary {
+                 { "ControllerName", "MyController" },
+                 { "ShowDeletedRecords", true }
+             })
+   ============================================ *@
+@model Report.Models.GridViewModelBase
+@{
+    var controllerName = ViewData["ControllerName"] ?? ViewContext.RouteData.Values["controller"];
+    var showDeletedRecords = ViewData["ShowDeletedRecords"] != null && (bool)ViewData["ShowDeletedRecords"];
+}
+
+<div class="report-toolbar">
+    @using (Html.BeginForm("Index", controllerName?.ToString(), FormMethod.Get, new { @class = "page-size-form toolbar-form" }))
+    {
+        <div class="sort-direction-box">
+            @Html.DropDownListFor(
+                x => x.SortDirection,
+                new SelectList(
+                    new[]
+                    {
+                        new { Value = "asc", Text = "Ascending" },
+                        new { Value = "desc", Text = "Descending" }
+                    },
+                    "Value",
+                    "Text",
+                    Model.SortDirection),
+                new { @class = "form-control page-size-select", onchange = "this.form.submit()" })
+        </div>
+
+        <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
+        <input type="hidden" name="PageSize" value="@Model.PageSize" />
+        @Html.HiddenFor(x => x.SearchText)
+        @Html.HiddenFor(x => x.PageNumber)
+    }
+
+    <div style="display:flex; gap:8px; margin-left:auto;">
+        @if (showDeletedRecords)
+        {
+            <button type="button" id="btnDeletedRecords" class="btn modern-btn" style="background:#6b21a8 !important; border-color:#6b21a8 !important; color:#fff !important; font-weight:700;">Deleted Records</button>
+        }
+        <button type="button" id="btnAddRow" class="btn modern-btn modern-btn-primary">Add Row</button>
+    </div>
+</div>

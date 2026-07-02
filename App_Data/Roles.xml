@@ -24,6 +24,10 @@
       <Permission>AuditTrail.GetAuditLogs</Permission>
       <Permission>AuditTrail.AuditLogs</Permission>
       <Permission>AuditTrail.DeletedRecords</Permission>
+      <Permission>Account.ChangePassword</Permission>
+      <Permission>User.Index</Permission>
+      <Permission>User.SaveChanges</Permission>
+      <Permission>User.ToggleActive</Permission>
     </Permissions>
   </Role>
 </Roles>
