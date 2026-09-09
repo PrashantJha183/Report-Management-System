@@ -8,12 +8,10 @@ namespace Report.Models
         public int UserId { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }
-        public string PasswordSalt { get; set; }
         public string DisplayName { get; set; }
         public string Role { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedOn { get; set; }
-        public DateTime? PasswordChangedOn { get; set; }
     }
 
     public class ChangePasswordViewModel
@@ -31,7 +29,6 @@ namespace Report.Models
         public string Role { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedOn { get; set; }
-        public DateTime? PasswordChangedOn { get; set; }
     }
 
     public class UserChange

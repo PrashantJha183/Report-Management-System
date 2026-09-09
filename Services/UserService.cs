@@ -2,10 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Web;
-using System.Web.Configuration;
 using System.Xml.Linq;
 using Report.Models;
 
@@ -14,14 +12,11 @@ namespace Report.Services
     public class UserService
     {
         private static readonly string UsersXmlPath;
-        private static readonly int Iterations;
         private static readonly object _lock = new object();
 
         static UserService()
         {
             UsersXmlPath = HttpContext.Current.Server.MapPath("~/App_Data/Users.xml");
-            int.TryParse(WebConfigurationManager.AppSettings["PasswordHashIterations"], out var iters);
-            Iterations = iters > 0 ? iters : 100000;
         }
 
         public Task<ComMstUser> ValidateUserAsync(string username, string password)
@@ -39,42 +34,9 @@ namespace Report.Services
                 if (userElement == null) return Task.FromResult<ComMstUser>(null);
 
                 var storedPassword = (string)userElement.Element("Password");
-                var storedSalt = (string)userElement.Element("PasswordSalt");
 
-                bool valid;
-                bool needsMigration = false;
-
-                if (string.IsNullOrEmpty(storedSalt))
-                {
-                    valid = storedPassword == password;
-                    if (valid)
-                        needsMigration = true;
-                }
-                else
-                {
-                    valid = VerifyPassword(password, storedPassword, storedSalt);
-                }
-
-                if (!valid) return Task.FromResult<ComMstUser>(null);
-
-                if (needsMigration)
-                {
-                    var newSalt = GenerateSalt();
-                    var newHash = HashPassword(password, newSalt);
-                    userElement.Element("Password").Value = newHash;
-                    if (userElement.Element("PasswordSalt") == null)
-                        userElement.Add(new XElement("PasswordSalt", newSalt));
-                    else
-                        userElement.Element("PasswordSalt").Value = newSalt;
-
-                    var changedOn = userElement.Element("PasswordChangedOn");
-                    if (changedOn == null)
-                        userElement.Add(new XElement("PasswordChangedOn", DateTime.UtcNow.ToString("o")));
-                    else
-                        changedOn.Value = DateTime.UtcNow.ToString("o");
-
-                    doc.Save(UsersXmlPath);
-                }
+                if (storedPassword != password)
+                    return Task.FromResult<ComMstUser>(null);
 
                 return Task.FromResult(new ComMstUser
                 {
@@ -103,31 +65,11 @@ namespace Report.Services
                     return Task.FromResult("ERROR:User not found.");
 
                 var storedPassword = (string)userElement.Element("Password");
-                var storedSalt = (string)userElement.Element("PasswordSalt");
 
-                bool valid;
-                if (string.IsNullOrEmpty(storedSalt))
-                    valid = storedPassword == currentPassword;
-                else
-                    valid = VerifyPassword(currentPassword, storedPassword, storedSalt);
-
-                if (!valid)
+                if (storedPassword != currentPassword)
                     return Task.FromResult("ERROR:Current password is incorrect.");
 
-                var newSalt = GenerateSalt();
-                var newHash = HashPassword(newPassword, newSalt);
-
-                userElement.Element("Password").Value = newHash;
-                if (userElement.Element("PasswordSalt") == null)
-                    userElement.Add(new XElement("PasswordSalt", newSalt));
-                else
-                    userElement.Element("PasswordSalt").Value = newSalt;
-
-                var changedOn = userElement.Element("PasswordChangedOn");
-                if (changedOn == null)
-                    userElement.Add(new XElement("PasswordChangedOn", DateTime.UtcNow.ToString("o")));
-                else
-                    changedOn.Value = DateTime.UtcNow.ToString("o");
+                userElement.Element("Password").Value = newPassword;
 
                 doc.Save(UsersXmlPath);
             }
@@ -161,10 +103,7 @@ namespace Report.Services
                     DisplayName = (string)u.Element("DisplayName") ?? "",
                     Role = (string)u.Element("Role") ?? "",
                     IsActive = (string)u.Element("IsActive") == "true",
-                    CreatedOn = DateTime.Parse((string)u.Element("CreatedOn") ?? DateTime.UtcNow.ToString("o")),
-                    PasswordChangedOn = u.Element("PasswordChangedOn") != null
-                        ? DateTime.Parse((string)u.Element("PasswordChangedOn"))
-                        : (DateTime?)null
+                    CreatedOn = DateTime.Parse((string)u.Element("CreatedOn") ?? DateTime.UtcNow.ToString("o"))
                 });
 
                 if (!string.IsNullOrWhiteSpace(filter.SearchText))
@@ -257,11 +196,7 @@ namespace Report.Services
                                 case "Password":
                                     if (!string.IsNullOrWhiteSpace(change.NewValue))
                                     {
-                                        var salt = GenerateSalt();
-                                        var hash = HashPassword(change.NewValue, salt);
-                                        newUser.Element("Password").Value = hash;
-                                        newUser.Add(new XElement("PasswordSalt", salt));
-                                        newUser.Add(new XElement("PasswordChangedOn", DateTime.UtcNow.ToString("o")));
+                                        newUser.Element("Password").Value = change.NewValue;
                                     }
                                     break;
                                 case "DisplayName":
@@ -296,17 +231,7 @@ namespace Report.Services
                                 case "Password":
                                     if (!string.IsNullOrWhiteSpace(change.NewValue))
                                     {
-                                        var salt = GenerateSalt();
-                                        var hash = HashPassword(change.NewValue, salt);
-                                        userElement.Element("Password").Value = hash;
-                                        if (userElement.Element("PasswordSalt") == null)
-                                            userElement.Add(new XElement("PasswordSalt", salt));
-                                        else
-                                            userElement.Element("PasswordSalt").Value = salt;
-                                        if (userElement.Element("PasswordChangedOn") == null)
-                                            userElement.Add(new XElement("PasswordChangedOn", DateTime.UtcNow.ToString("o")));
-                                        else
-                                            userElement.Element("PasswordChangedOn").Value = DateTime.UtcNow.ToString("o");
+                                        userElement.Element("Password").Value = change.NewValue;
                                     }
                                     break;
                                 case "DisplayName":
@@ -387,37 +312,6 @@ namespace Report.Services
                     .Max() ?? 0;
                 return Task.FromResult(maxId + 1);
             }
-        }
-
-        public static string GenerateSalt()
-        {
-            var salt = new byte[16];
-            using (var rng = new RNGCryptoServiceProvider())
-            {
-                rng.GetBytes(salt);
-            }
-            return Convert.ToBase64String(salt);
-        }
-
-        public static string HashPassword(string password, string salt)
-        {
-            var saltBytes = Convert.FromBase64String(salt);
-            using (var pbkdf2 = new Rfc2898DeriveBytes(password, saltBytes, Iterations))
-            {
-                return Convert.ToBase64String(pbkdf2.GetBytes(32));
-            }
-        }
-
-        public static bool VerifyPassword(string password, string storedHash, string storedSalt)
-        {
-            var hashBytes = Convert.FromBase64String(HashPassword(password, storedSalt));
-            var storedBytes = Convert.FromBase64String(storedHash);
-
-            int diff = hashBytes.Length ^ storedBytes.Length;
-            for (int i = 0; i < hashBytes.Length && i < storedBytes.Length; i++)
-                diff |= hashBytes[i] ^ storedBytes[i];
-
-            return diff == 0;
         }
     }
 }
