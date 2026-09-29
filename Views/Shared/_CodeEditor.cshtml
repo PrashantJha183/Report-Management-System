@@ -1,0 +1,189 @@
+﻿@{
+    var editorId = ViewBag.EditorId as string ?? "editorContainer";
+    var hiddenFieldId = ViewBag.HiddenFieldId as string ?? "hdnCode";
+    var classList = ViewBag.ClassList;
+}
+
+<div id="@editorId" style="width:100%; height:420px; border:1px solid #3c3c3c; border-radius:4px;"></div>
+<input type="hidden" id="@hiddenFieldId" name="Code" value="@ViewBag.Code" />
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+
+<script>
+    const csharpKeywords = [
+        "int", "string", "float", "double", "decimal", "bool", "var",
+        "class", "struct", "interface", "enum", "namespace",
+        "public", "private", "protected", "internal", "static",
+        "void", "new", "return", "if", "else", "for", "foreach",
+        "while", "do", "switch", "case", "break", "continue",
+        "try", "catch", "finally", "using", "this", "base", "null", "true", "false"
+    ];
+    var dynamicClasses = [];
+    let allKeywords;
+
+    function updateClasses(newClasses) {
+        dynamicClasses = newClasses || [];
+        allKeywords = csharpKeywords.concat(dynamicClasses);
+    }
+    window.updateClasses = updateClasses;
+
+(function () {
+
+    const editorId = "@editorId";
+    const hiddenFieldId = "@hiddenFieldId";
+
+    const serverClasses = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(classList ?? new List<string>()));
+
+    allKeywords = csharpKeywords.concat(serverClasses);
+
+    require.config({
+        paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }
+    });
+
+    require(["vs/editor/editor.main"], function () {
+
+        var editor = monaco.editor.create(document.getElementById(editorId), {
+            value: "",
+            language: "csharp",
+            theme: "vs-dark",
+            automaticLayout: true,
+            quickSuggestions: { other: true, comments: false, strings: false },
+            suggestOnTriggerCharacters: true,
+            wordBasedSuggestions: "off"
+        });
+
+        window.editor = editor;
+
+        editor.setValue(@Html.Raw(Json.Encode(ViewBag.Code ?? "")));
+
+        // Sync editor to hidden field on content change
+        editor.onDidChangeModelContent(function () {
+            var hf = document.getElementById(hiddenFieldId);
+            if (hf) hf.value = editor.getValue();
+        });
+
+        // Sync on form submit
+        var form = document.querySelector("form");
+        if (form) {
+            form.addEventListener("submit", function () {
+                document.getElementById(hiddenFieldId).value = editor.getValue();
+            });
+        }
+
+        // -------- Keyword + class autocomplete --------
+        monaco.languages.registerCompletionItemProvider("csharp", {
+            provideCompletionItems: function (model, position) {
+
+                const wordInfo = model.getWordUntilPosition(position);
+                const word = wordInfo.word;
+
+                const suggestions = allKeywords
+                    .filter(k => k.toLowerCase().startsWith(word.toLowerCase()))
+                    .map(k => ({
+                        label: k,
+                        kind: monaco.languages.CompletionItemKind.Keyword,
+                        insertText: k,
+                        range: new monaco.Range(
+                            position.lineNumber,
+                            wordInfo.startColumn,
+                            position.lineNumber,
+                            wordInfo.endColumn
+                        )
+                    }));
+
+                return { suggestions: suggestions };
+            }
+        });
+
+        // -------- Dot (.) IntelliSense --------
+        monaco.languages.registerCompletionItemProvider('csharp', {
+            triggerCharacters: ['.'],
+            provideCompletionItems: function (model, position, context) {
+
+                return new Promise(function (resolve) {
+
+                    var text = model.getValueInRange({
+                        startLineNumber: position.lineNumber,
+                        startColumn: 1,
+                        endLineNumber: position.lineNumber,
+                        endColumn: position.column
+                    });
+
+                    var expr = text.substring(0, text.lastIndexOf('.'));
+
+                    $.post('@Url.Action("Completions", "Intellisense")',
+                        {
+                            fullcode: editor.getValue(),
+                            expression: expr
+                        },
+                        function (res) {
+                            var suggestions = (res || []).map(function (m) {
+                                return {
+                                    label: m.label,
+                                    kind: monaco.languages.CompletionItemKind[
+                                        m.kind === "Method" ? "Method" : "Property"
+                                    ],
+                                    insertText: m.label
+                                };
+                            });
+
+                            resolve({ suggestions: suggestions });
+                        }
+                    );
+                });
+            }
+        });
+
+        // -------- Method signature help --------
+        monaco.languages.registerSignatureHelpProvider('csharp', {
+            signatureHelpTriggerCharacters: ['('],
+            provideSignatureHelp: function (model, position) {
+
+                return new Promise(function (resolve) {
+
+                    var text = model.getValueInRange({
+                        startLineNumber: position.lineNumber,
+                        startColumn: 1,
+                        endLineNumber: position.lineNumber,
+                        endColumn: position.column
+                    });
+
+                    var expr = text.substring(0, text.lastIndexOf('('));
+
+                    $.post('@Url.Action("Signatures", "Intellisense")',
+                        { expression: expr },
+                        function (res) {
+                            if (!res || !res.signatures || res.signatures.length === 0) {
+                                resolve(null);
+                                return;
+                            }
+
+                            var sigs = res.signatures.map(function (s) {
+                                return {
+                                    label: s.name + "(" +
+                                        s.parameters.map(p => p.type + " " + p.name).join(", ") +
+                                        ") : " + s.returnType,
+                                    parameters: s.parameters.map(p => ({
+                                        label: p.type + " " + p.name
+                                    }))
+                                };
+                            });
+
+                            resolve({
+                                value: {
+                                    signatures: sigs,
+                                    activeSignature: 0,
+                                    activeParameter: 0
+                                },
+                                dispose: function () { }
+                            });
+                        }
+                    );
+                });
+            }
+        });
+
+    });
+
+})();
+</script>

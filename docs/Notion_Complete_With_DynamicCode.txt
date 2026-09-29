@@ -1,0 +1,2823 @@
+# Technical Design Document
+
+| Attribute | Details |
+| --- | --- |
+| **Project Name** | Report Management System |
+| **Project Type** | Enterprise Administrative Portal |
+| **Version** | 1.0.0 |
+| **Prepared By** | Development Team |
+| **Document Type** | Technical Design Document |
+| **Technology Stack** | ASP.NET MVC 5, .NET Framework 4.7, ADO.NET, SQL Server, MySQL, jQuery, Bootstrap 3 |
+| **Deployment Model** | IIS Hosted Web Application |
+| **Supported Databases** | SQL Server, MySQL |
+| **Date** | June 2026 |
+
+---
+
+## Technology Stack Overview
+
+| Layer | Technology |
+| --- | --- |
+| **Frontend** | ASP.NET MVC Razor Views |
+| **UI Framework** | Bootstrap 3 |
+| **Client-Side Scripting** | jQuery |
+| **Backend Framework** | ASP.NET MVC 5 (.NET Framework 4.7) |
+| **Business Layer** | Service-Oriented Architecture |
+| **Data Access Layer** | ADO.NET with Provider Abstraction |
+| **Database** | SQL Server / MySQL |
+| **Authentication** | Session-Based Authentication |
+| **Audit Logging** | Database Audit Trail with JSON Snapshots |
+| **System Logging** | XML-Based Query and Error Logging |
+| **Configuration Management** | Web.config + DbConnection.xml |
+| **Hosting Environment** | Internet Information Services (IIS) |
+| **Architecture Pattern** | Layered N-Tier Architecture |
+
+---
+
+# 1. Executive Summary
+
+## 1.1 Business Problem
+
+The organization relies on multiple database-driven configuration modules that control reporting, alerting, and company-level system behavior. These configurations are critical to day-to-day business operations and include:
+
+| Configuration Area | Purpose |
+| --- | --- |
+| Report Definitions | Define report queries, metadata, and execution behavior |
+| Report Columns | Configure report output structure and display columns |
+| Report Filters | Define filtering criteria and search parameters |
+| Alert Configurations | Configure automated alert generation |
+| Alert Scheduling | Manage alert execution frequency and timing |
+| Alert Attachments | Configure alert-related file attachments |
+| Company Configurations | Store organization-wide application settings |
+| Dynamic Code | Store runtime C# code overrides executed by the ERP application |
+
+Historically, these records were managed directly through database scripts and manual SQL operations. This approach introduced several operational and technical challenges.
+
+### 1.1.1 Key Challenges
+
+- High dependency on database administrators and developers for routine configuration changes
+- Accidental data corruption caused by manual database modifications
+- Risk of unintended record deletion without recovery mechanisms
+- No centralized administration interface for business users
+- Lack of validation before data modifications
+- No visibility into configuration changes
+- Absence of audit trails for compliance and troubleshooting
+- Difficulty maintaining parent-child relationships across dependent entities
+- Increased operational overhead for managing configuration data
+- Inconsistent management processes across different configuration modules
+
+As the application evolved, the need for a secure, centralized, and user-friendly administration portal became increasingly important.
+
+---
+
+## 1.2 Solution Overview
+
+The Report Management System is a centralized administrative web application developed using ASP.NET MVC 5.2.7 on the .NET Framework 4.7. The application provides a secure, web-based interface for managing report configurations, company configurations, alert configurations, scheduling information, report metadata, and other administrative entities without requiring direct database access.
+
+The system was designed to replace manual database-driven administration processes with a structured management platform that emphasizes security, maintainability, auditability, and operational consistency across all supported business modules.
+
+Unlike traditional configuration management systems that rely on fixed database connectivity, the application supports runtime database selection through a dynamic connection management framework. During authentication, users select the target database connection, after which the application establishes a session-specific database context. This enables the same application instance to operate against multiple SQL Server and MySQL environments without requiring code changes or separate deployments.
+
+Authentication is implemented using XML-based user management combined with session-based authorization. User accounts, roles, and database connection information are maintained through centralized XML configuration files, allowing administrative management without modifying application code. Following successful authentication, user identity, role information, and database connection settings are stored within the ASP.NET Session and are utilized throughout the request lifecycle.
+
+Role-based authorization ensures that users can access only the operations permitted by their assigned role. The authorization framework combines server-side request validation with user interface restrictions to prevent unauthorized operations while providing a consistent user experience.
+
+The application follows a layered architecture consisting of Presentation, Controller, Service, Data Access, and Database layers. Business logic is encapsulated within service classes, while the Data Access Layer provides a provider-based abstraction that supports both SQL Server and MySQL databases through a unified programming model.
+
+Every create, update, and delete operation is executed within a controlled database transaction. Prior to data modification, the existing database record is captured as a JSON snapshot and stored within the audit repository, providing complete historical traceability for compliance, troubleshooting, and recovery purposes.
+
+In addition to database audit logging, the application maintains XML-based query logs and error logs, enabling administrators to diagnose application behavior, monitor executed SQL statements, and investigate runtime exceptions.
+
+The Report Management System also hosts the **Dynamic Code module** — an administration IDE (Monaco editor with IntelliSense) for authoring C# code snippets that are persisted to the shared `CustomCode` table. At runtime the ERP application intercepts matching controller/action requests and executes these snippets, allowing endpoint behavior to be overridden from Report without redeploying the ERP application.
+
+The Report Management System provides a centralized, secure, and extensible administrative platform that combines configuration management, dynamic database connectivity, comprehensive auditing, role-based security, and runtime code extensibility within a single enterprise application.
+
+### 1.2.1 Administrative Modules
+
+The Report Management System consists of seven independent administrative modules. Each module is implemented using its own MVC Controller, Service Layer, Razor View (`Index.cshtml`), JavaScript file, and CSS file.
+
+In addition to the module list above, the system hosts the **Dynamic Code module** — an administration IDE for authoring C# runtime code overrides. Snippets are stored in the shared `CustomCode` table and executed at runtime by the ERP application, allowing endpoint behavior to be overridden without redeploying the ERP (see 4.9 Dynamic Code Module).
+
+```
+Report/
+├── App_Data/
+│   ├── DbConnection.xml
+│   ├── ErrorLogs/
+│   │   └── ErrorLog_yyyy-MM-dd.xml
+│   ├── QueryLogs/
+│   │   └── QueryLog_yyyy-MM-dd.xml
+│   ├── Roles.xml
+│   └── Users.xml
+├── App_Start/
+│   └── FilterConfig.cs
+├── Controllers/
+│   ├── AlertConfigAttachmentController.cs
+│   ├── AlertConfigController.cs
+│   ├── AlertScheduleController.cs
+│   ├── AuditTrailController.cs
+│   ├── CompanyConfigController.cs
+│   ├── DynamicCodeController.cs
+│   ├── HomeController.cs
+│   ├── IntellisenseController.cs
+│   ├── NameSpaceController.cs
+│   ├── ReportColumnController.cs
+│   ├── ReportController.cs
+│   └── ReportFilteringColumnController.cs
+├── Filters/
+├── js/
+│   ├── AlertConfig.js
+│   ├── AlertConfigAttachment.js
+│   ├── AlertSchedule.js
+│   ├── CompanyConfig.js
+│   ├── DynamicCode.js
+│   ├── Home.js
+│   ├── ReportColumn.js
+│   ├── ReportFilteringColumn.js
+│   └── ReportMaster.js
+├── Models/
+│   ├── AuditLog.cs
+│   ├── ComMstAlertConfig.cs
+│   ├── ComMstRole.cs
+│   ├── ComMstUser.cs
+│   ├── ConnectionInfo.cs
+│   └── DynamicCodeModels.cs
+├── Services/
+│   ├── AlertConfigAttachmentService.cs
+│   ├── AlertConfigService.cs
+│   ├── AlertScheduleService.cs
+│   ├── AuditLogService.cs
+│   ├── CompanyConfigService.cs
+│   ├── CustomCodeDAL.cs
+│   ├── Dal.cs
+│   ├── DynamicCodeService.cs
+│   ├── ErrorLogger.cs
+│   ├── IDal.cs
+│   ├── QueryLogger.cs
+│   ├── ReportColumnService.cs
+│   ├── ReportConfig.cs
+│   ├── ReportFilteringColumnService.cs
+│   ├── ReportService.cs
+│   ├── RoleService.cs
+│   ├── ServiceHelper.cs
+│   └── UserService.cs
+├── Styles/
+│   ├── AlertConfig.css
+│   ├── AlertConfigAttachment.css
+│   ├── AlertSchedule.css
+│   ├── CompanyConfig.css
+│   ├── DynamicCode.css
+│   ├── Home.css
+│   ├── ReportColumn.css
+│   ├── ReportFilteringColumn.css
+│   └── ReportMaster.css
+├── Views/
+│   ├── AlertConfig/
+│   │   └── Index.cshtml
+│   ├── AlertConfigAttachment/
+│   │   └── Index.cshtml
+│   ├── AlertSchedule/
+│   │   └── Index.cshtml
+│   ├── AuditTrail/
+│   │   └── AuditLogs.cshtml
+│   ├── CompanyConfig/
+│   │   └── Index.cshtml
+│   ├── DynamicCode/
+│   │   ├── IDE.cshtml
+│   │   └── Index.cshtml
+│   ├── Home/
+│   │   └── Index.cshtml
+│   ├── Report/
+│   │   └── Index.cshtml
+│   ├── ReportColumn/
+│   │   └── Index.cshtml
+│   ├── ReportFilteringColumn/
+│   │   └── Index.cshtml
+│   └── Shared/
+│       ├── _CodeEditor.cshtml
+│       ├── _Layout.cshtml
+│       └── _NamespaceEditor.cshtml
+├── Global.asax
+├── Global.asax.cs
+├── Web.config
+└── Web.Debug.config / Web.Release.config
+```
+
+## 1.3 Business Benefits
+
+| Benefit | Description |
+| --- | --- |
+| Reduced Database Dependency | Business users can manage application configurations without executing SQL scripts manually. |
+| Secure Administration | Session-based authentication and role-based authorization restrict unauthorized access to administrative functions. |
+| Dynamic Multi-Database Support | Users can connect to different SQL Server or MySQL environments through runtime database selection. |
+| Centralized Configuration Management | Reports, alerts, schedules, attachments, and company configurations are managed through a unified administration portal. |
+| Improved Data Integrity | Validation rules, dependency verification, and transactional processing minimize inconsistent or invalid data. |
+| Complete Auditability | Every update and deletion is captured with full JSON snapshots for historical tracking and recovery. |
+| Operational Transparency | Query logging and error logging provide complete visibility into application behavior and database interactions. |
+| Better Maintainability | Standardized architectural patterns simplify enhancements and long-term maintenance. |
+| Controlled Access | Role-based permissions ensure that sensitive operations such as record deletion are restricted to authorized users. |
+| Cross-Database Compatibility | A single application deployment supports multiple database providers without source code modifications. |
+| Improved Troubleshooting | XML-based query logs, error logs, and audit history simplify issue investigation and diagnostics. |
+| Scalability | The modular architecture allows additional administrative modules to be introduced with minimal architectural changes. |
+| Dynamic Extensibility | ERP endpoint behavior can be overridden with C# code authored in Report — no ERP redeployment required. |
+
+## 1.4 Project Objectives
+
+The primary objectives of the Report Management System are:
+
+1. Eliminate direct database dependency for routine administrative configuration management.
+2. Provide a secure web-based administration portal with centralized authentication.
+3. Support role-based authorization for protecting sensitive application functionality.
+4. Enable runtime database selection across SQL Server and MySQL environments.
+5. Maintain complete historical visibility of configuration changes through audit logging.
+6. Ensure transactional consistency during all create, update, and delete operations.
+7. Record executed database modification queries and runtime exceptions for operational monitoring.
+8. Standardize business logic through a layered service-oriented architecture.
+9. Improve maintainability through reusable design patterns and centralized configuration management.
+10. Provide a scalable foundation for future enhancements including Role-Based Access Control (RBAC), external authentication providers, API integration, and application modernization.
+11. Provide a mechanism for authoring runtime ERP code overrides (Dynamic Code) that take effect without redeploying the ERP application.
+
+The Report Management System serves as the centralized administrative platform for managing reports, report columns, report filtering, alert configurations, alert schedules, alert attachments, company configurations, authentication, authorization, auditing, multi-database administration, and runtime code extensibility across the organization.
+
+---
+
+# 2. High-Level Architecture
+
+## 2.1 Architectural Overview
+
+The Report Management System follows a layered architecture pattern that separates presentation, business logic, data access, and database operations into independent layers.
+
+This separation ensures:
+
+- Maintainability
+- Scalability
+- Testability
+- Security
+- Database independence
+- Reusability of business components
+
+The application is built using ASP.NET MVC 5 and follows a structured request-processing pipeline where all user interactions flow through Controllers, Services, and the Data Access Layer before reaching the database.
+
+## 2.2 System Architecture
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                        Client Layer                           │
+├───────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ASP.NET MVC Razor Views                                      │
+│  Bootstrap 3 User Interface                                   │
+│  jQuery & AJAX Operations                                     |
+|  Role-based UI Rendering                                      │
+│                                                               │
+└───────────────────────────────┬───────────────────────────────┘
+                                │
+                                ▼
+┌───────────────────────────────────────────────────────────────┐
+│                     Controller Layer                          │
+├───────────────────────────────────────────────────────────────┤
+│                                                               │
+│  HomeController (Authentication)                              │
+│  ReportController                                             │
+│  ReportColumnController                                       │
+│  ReportFilteringColumnController                              │
+│  AlertConfigController                                        │
+│  AlertScheduleController                                      │
+│  AlertConfigAttachmentController                              │
+│  CompanyConfigController                                      │
+│  AuditTrailController                                         │
+│  DynamicCodeController                                        │
+│  NameSpaceController                                          │
+│  IntellisenseController                                       │
+│                                                               │
+└───────────────────────────────┬───────────────────────────────┘
+                                │
+                                ▼
+┌───────────────────────────────────────────────────────────────┐
+│                       Service Layer                           │
+├───────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ReportService                                                │
+│  ReportColumnService                                          │
+│  ReportFilteringColumnService                                 │
+│  AlertConfigService                                           │
+│  AlertScheduleService                                         │
+│  AlertConfigAttachmentService                                 │
+│  CompanyConfigService                                         │
+│  AuditLogService                                              │
+│  DynamicCodeService                                           │
+│  CustomCodeDAL                                                │
+│                                                               │
+│  Cross-Cutting Components                                     |
+|  • UserService                                                |
+|  • RoleService                                                │
+│  • ServiceHelper                                              │
+│  • QueryLogger                                                │
+│  • ErrorLogger                                                │
+│  • ReportConfig                                               │
+│                                                               │
+└───────────────────────────────┬───────────────────────────────┘
+                                │
+                                ▼
+┌───────────────────────────────────────────────────────────────┐
+│                    Data Access Layer                          │
+├───────────────────────────────────────────────────────────────┤
+│                                                               │
+│  IDal Interface                                               │
+│  Dal Implementation                                           │
+│                                                               │
+│  Responsibilities                                             │
+│  • Dynamic Connection Management                              |
+|  • Runtime Database Selection                                 |
+|  • Session-Bases Connection Resolution                        |
+|	 • Provider Factory Management                                │
+│  • Query Execution                                            │
+│  • Transaction Handling                                       │
+│  • Provider Abstraction                                       │
+│                                                               │
+└───────────────────────────────┬───────────────────────────────┘
+                                │
+                                ▼
+┌───────────────────────────────────────────────────────────────┐
+│                     Database Layer                            │
+├───────────────────────────────────────────────────────────────┤
+│                                                               │
+│  Mutiple SQL Server Databases                                 │
+│  Mutiple MySQL Databases                                      │
+│                                                               │
+│  Managed Tables                                               │
+│  • com_mst_report                                             │
+│  • com_mst_reportcolumn                                       │
+│  • com_mst_reportfilteringcolumn                              │
+│  • com_mst_alertconfig                                        │
+│  • com_mst_alertschedule                                      │
+│  • com_mst_alertconfigattachment                              │
+│  • com_mst_companyconfig                                      │
+│  • com_mst_audit_log                                          │
+│  • com_mst_customcode (CustomCode — shared with the ERP)      │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
+```
+
+## 2.3 Request Flow
+
+Every user request follows the same execution path throughout the application.
+
+```
+User Action
+      │
+      ▼
+Razor View / jQuery
+      │
+      ▼
+MVC Controller
+      │
+      ▼
+Service Layer
+      │
+      ▼
+IDal / Dal
+      │
+      ▼
+SQL Server / MySQL
+      │
+      ▼
+Response Returned
+      │
+      ▼
+UI Updated
+```
+
+## 2.4 Architectural Benefits
+
+| Benefit | Description |
+| --- | --- |
+| Separation of Concerns | UI, business logic, and database access remain isolated |
+| Maintainability | Changes in one layer have minimal impact on other layers |
+| Scalability | New modules can be added following existing architectural patterns |
+| Testability | Business logic is isolated within service classes |
+| Security | Validation, authentication, and SQL protection are centralized |
+| Auditability | All modifications pass through service-level audit logging |
+| Database Independence | Same application supports SQL Server and MySQL |
+| Reusability | Shared DAL and service patterns reduce code duplication |
+| Reliability | Transaction management ensures data consistency |
+| Benefit | Description |
+| Dynamic Database Connectivity | Users can connect to different database environments without redeployment. |
+| Role-Based Security | Authorization is enforced at both the server and user interface levels. |
+| Operational Monitoring | XML-based query and error logging simplify diagnostics and troubleshooting. |
+| Configuration Driven | Authentication, roles, and database connections are maintained through XML configuration files. |
+| Dynamic Code Extensibility | Runtime ERP behavior can be overridden via the shared CustomCode table without ERP redeployment. |
+
+## 2.5 Architectural Design Principles
+
+The application was designed around the following principles:
+
+- Layered Architecture
+- Service-Oriented Business Logic
+- Provider-Based Database Abstraction
+- Transactional Data Processing
+- Centralized Configuration Management
+- Full Audit Traceability
+- Secure Dynamic SQL Construction
+- Reusable CRUD Patterns
+- Modular Entity Management
+- XML-Based Configuration Management
+- Session-Based Authentication
+- Role-Based Authorization
+- Runtime Database Provider Resolution
+- Centralized Operational Logging
+- Cross-Application Runtime Extensibility
+
+This architecture provides a robust foundation for managing report configurations, alert systems, scheduling rules, company-level settings, and runtime code overrides while ensuring security, maintainability, and long-term extensibility.
+
+---
+
+# 3. Architectural Layers and Core System Modules
+
+The Report Management System follows a layered, service-oriented architecture in which responsibilities are clearly separated across the Presentation, Controller, Service, Data Access, Configuration, and Database layers. Each business module is implemented using a consistent ASP.NET MVC design pattern consisting of dedicated Controllers, Services, Razor Views, JavaScript files, and CSS components while sharing common infrastructure such as authentication, authorization, transaction management, audit logging, query logging, error logging, and dynamic database connectivity.
+
+The architecture promotes maintainability, extensibility, and database independence by isolating user interface concerns from business logic and data access. Cross-cutting services such as XML-based authentication, role management, configuration loading, operational logging, and provider-based database access are shared across all administrative modules through reusable framework components.
+
+Each user request follows a standardized execution pipeline beginning with authentication and authorization, followed by business validation, transactional processing, auditing, and database persistence before returning the response to the client.
+
+## 3.1 Presentation Layer
+
+The Presentation Layer provides the primary user interface for all administrative operations. It is implemented using ASP.NET MVC Razor Views, Bootstrap 3, jQuery, AJAX, and custom JavaScript components that enable responsive user interaction without requiring full page refreshes.
+
+### 3.1.1 Responsibilities
+
+- Render business management screens
+- Display searchable and paginated data grids
+- Present create and edit forms
+- Perform client-side validation
+- Submit AJAX requests
+- Display success and validation messages
+- Render audit history panels
+- Provide role-based user interface elements
+- Display authenticated user and active database information
+- Maintain responsive navigation and consistent user experience
+- Display authenticated user and active database environment within the application header.
+
+### 3.1.2 Key Components
+
+- Views/Home/Index.cshtml
+- Views/Shared/_Layout.cshtml
+- Views/Report/Index.cshtml
+- Views/ReportColumn/Index.cshtml
+- Views/ReportFilteringColumn/Index.cshtml
+- Views/AlertConfig/Index.cshtml
+- Views/AlertSchedule/Index.cshtml
+- Views/AlertConfigAttachment/Index.cshtml
+- Views/CompanyConfig/Index.cshtml
+- Views/AuditTrail/AuditLogs.cshtml
+- Views/DynamicCode/Index.cshtml — Dynamic Code grid + inline Monaco IDE panel
+- Views/DynamicCode/IDE.cshtml — standalone IDE page (Layout = null)
+- Views/Shared/_CodeEditor.cshtml — monaco-editor 0.45.0 partial (C# language, vs-dark theme, IntelliSense providers)
+- Views/Shared/_NamespaceEditor.cshtml — namespace textarea + autocomplete suggestion panel
+- js/DynamicCode.js — grid/IDE client logic (showIDE, populateIDE, loadClassesForNamespaces)
+- Styles/DynamicCode.css — Dynamic Code grid + IDE panel styling
+
+### 3.1.3 Technologies
+
+- ASP.NET MVC Razor Views
+- Bootstrap 3
+- jQuery
+- AJAX
+- JavaScript
+- CSS3
+- Monaco Editor 0.45.0 (CDN) — Dynamic Code IDE
+
+### 3.1.4 User Interface Features
+
+- Session-aware navigation
+- Role-based action visibility
+- Dynamic database selection during login
+- Side-panel audit history viewer
+- Inline validation and notifications
+- Responsive administrative dashboards
+- Inline Monaco code editor for authoring runtime overrides
+
+## 3.2 Controller Layer
+
+The Controller Layer serves as the primary entry point for all HTTP requests. Controllers coordinate communication between the Presentation Layer and Service Layer while enforcing authentication, authorization, model binding, and response generation.
+
+### 3.2.1 Responsibilities
+
+- Handle HTTP GET and POST requests
+- Authenticate users
+- Manage user sessions
+- Validate request models
+- Invoke business services
+- Return Views and JSON responses
+- Coordinate audit operations
+- Process CRUD requests
+- Handle navigation workflows
+
+### 3.2.2 Controllers
+
+- HomeController
+- ReportController
+- ReportColumnController
+- ReportFilteringColumnController
+- AlertConfigController
+- AlertScheduleController
+- AlertConfigAttachmentController
+- CompanyConfigController
+- AuditTrailController
+- DynamicCodeController — grid listing, inline save (SaveChanges), IDE save (SaveCode with compilation), GetCode, Delete
+- NameSpaceController — namespace autocomplete (Suggest) for the namespace editor
+- IntellisenseController — Monaco dot-completion (Completions) and method signature help (Signatures)
+
+### 3.2.3 Controller Characteristics
+
+- Session-aware request processing
+- Global authorization filter support
+- AJAX endpoint implementation
+- JSON serialization
+- Exception propagation to service layer
+- Separation of presentation and business logic
+
+## 3.3 Service Layer
+
+The Service Layer contains the complete business logic of the application. It validates requests, enforces business rules, coordinates transactions, performs auditing, manages authentication and authorization, and communicates with the Data Access Layer.
+
+### 3.3.1 Responsibilities
+
+- Business rule enforcement
+- Authentication validation
+- Role authorization
+- CRUD operations
+- Dependency verification
+- Audit logging
+- Query logging
+- Error handling
+- Transaction management
+- Dynamic SQL generation
+- Database interaction coordination
+
+### 3.3.2 Core Services
+
+- UserService
+- RoleService
+- ReportService
+- ReportColumnService
+- ReportFilteringColumnService
+- AlertConfigService
+- AlertScheduleService
+- AlertConfigAttachmentService
+- CompanyConfigService
+- AuditLogService
+- DynamicCodeService — grid CRUD with temp-ID mapping, IDE save (SaveCodeFromIDEAsync), audit logging on UPDATE/DELETE
+- CustomCodeDAL — CustomCode table CRUD (GetAll/GetById/GetByControllerAction/Add/Update/Delete/GetNextId)
+
+### 3.3.3 Supporting Components
+
+- ServiceHelper
+- QueryLogger
+- ErrorLogger
+- ReportConfig
+
+### 3.3.4 Service Design Characteristics
+
+- Service-oriented architecture
+- Centralized business validation
+- XML configuration integration
+- Provider-independent processing
+- Reusable CRUD framework
+- Transaction-aware operations
+
+## 3.4 Data Access Layer
+
+The Data Access Layer abstracts all database communication from the business layer through a provider-based implementation capable of working with multiple database engines.
+
+### 3.4.1 Responsibilities
+
+- Dynamic database connection management
+- Provider selection
+- Connection lifecycle management
+- Query execution
+- Transaction processing
+- Parameter handling
+- Exception propagation
+- Database abstraction
+
+### 3.4.2 Core Components
+
+- IDal
+- Dal
+- CustomCodeDAL
+
+### 3.4.3 Design Characteristics
+
+- Session-based database resolution
+- SQL Server support
+- MySQL support
+- Provider Factory implementation
+- Transaction support
+- Database-independent query execution
+- Runtime connection switching
+
+### 3.4.4 Dynamic Code Data Access Note
+
+Unlike the main `IDal`/`Dal` path, `CustomCodeDAL` does NOT use the `DbProviderFactory` abstraction — it hardcodes `System.Data.SqlClient`. The Dynamic Code module therefore works on SQL Server environments but fails on MySQL (GEETEE). See section 6.7 Dynamic Code Cross-Database Limitation.
+
+## 3.5 Configuration Layer
+
+The Configuration Layer centralizes application settings, authentication information, role definitions, and database connection details through XML-based configuration files.
+
+### 3.5.1 Responsibilities
+
+- User account management
+- Role configuration
+- Database connection management
+- Table configuration
+- Application settings
+- Environment configuration
+- Provider configuration
+
+### 3.5.2 Key Components
+
+- App_Data/Users.xml
+- App_Data/Roles.xml
+- App_Data/DbConnection.xml
+- ReportConfig.cs
+- Web.config
+
+### 3.5.3 Benefits
+
+- Centralized configuration
+- No code changes for database switching
+- Easy user management
+- Environment flexibility
+- Simplified deployment
+
+### 3.5.4 Dynamic Code Configuration
+
+The Dynamic Code module adds the following Web.config appSettings, read through `ReportConfig.cs`:
+
+- Web.config → `DynamicCodeTable` = `CustomCode` — backing table for Dynamic Code entries
+- Web.config → `DynamicCodePageSize` = `7` — grid page size
+- Web.config → `DefaultNamespaces` = `Report.Controllers, Report.Services, System.Web.Mvc, System.Collections.Generic, System.Linq` — base using set applied to every snippet
+
+---
+
+# 4. Core Business Modules
+
+The Report Management System consists of multiple administrative modules responsible for managing reports, report metadata, filtering rules, alert processing, scheduling, attachments, company-level configurations, audit history, and runtime code overrides. Each module follows a standardized MVC architecture consisting of dedicated Controllers, Services, Razor Views, JavaScript components, CSS resources, and shared infrastructure for authentication, authorization, transaction management, audit logging, query logging, and dynamic database connectivity.
+
+All modules implement a consistent CRUD workflow while maintaining data integrity through validation, dependency verification, transactional processing, and comprehensive audit tracking.
+
+### 4.1 Report Master Management
+
+Responsible for managing report definitions and execution behavior.
+
+### 4.1.1 Capabilities
+
+- Create and maintain report definitions
+- Configure SQL queries
+- Configure sorting and ordering
+- Manage report metadata
+- Support master-detail reporting
+- Configure report execution settings
+- Manage report types and filters
+
+### 4.1.2 Architectural Components
+
+| Component | Implementation |
+| --- | --- |
+| Controller | ReportController |
+| Service | ReportService |
+| View | Views/Report/Index.cshtml |
+| JavaScript | js/ReportMaster.js |
+| Stylesheet | Styles/ReportMaster.css |
+| Authentication | Session-Based |
+| Authorization | Role-Based |
+| Audit Logging | Supported |
+| Query Logging | Supported |
+| Transaction Support | Supported |
+
+---
+
+### 4.2 Report Column Management
+
+Responsible for controlling report output structure.
+
+### 4.2.1 Capabilities
+
+- Configure report columns
+- Define display names
+- Configure database column mappings
+- Configure data types
+- Define display order
+- Configure searchable columns
+- Configure grouping behavior
+- Manage filterable columns
+
+### 4.2.2 Architectural Components
+
+| Component | Implementation |
+| --- | --- |
+| Controller | ReportColumnController |
+| Service | ReportColumnService |
+| View | Views/ReportColumn/Index.cshtml |
+| JavaScript | js/ReportColumn.js |
+| Stylesheet | Styles/ReportColumn.css |
+| Authentication | Session-Based |
+| Authorization | Role-Based |
+| Audit Logging | Supported |
+| Query Logging | Supported |
+| Transaction Support | Supported |
+
+### 4.3 Report Filtering Column Management
+
+Responsible for defining report filtering behavior.
+
+### 4.3.1 Capabilities
+
+- Configure filtering rules
+- Define filter operators
+- Support range filtering
+- Configure conditional logic
+- Manage search behavior
+- Associate filters with report columns
+
+### 4.3.2 Architectural Components
+
+| Component | Implementation |
+| --- | --- |
+| Controller | ReportFilteringColumnController |
+| Service | ReportFilteringColumnService |
+| View | Views/ReportFilteringColumn/Index.cshtml |
+| JavaScript | js/ReportFilteringColumn.js |
+| Stylesheet | Styles/ReportFilteringColumn.css |
+| Authentication | Session-Based |
+| Authorization | Role-Based |
+| Audit Logging | Supported |
+| Query Logging | Supported |
+| Transaction Support | Supported |
+
+### 4.4 Alert Configuration Management
+
+Responsible for managing alert definitions and notification behavior.
+
+### 4.4.1 Capabilities
+
+- Create alert configurations
+- Configure email notifications
+- Manage email templates
+- Configure attachment behavior
+- Configure alert types
+- Support multi-alert execution
+- Manage alert status and activation
+
+### 4.4.2 Architectural Components
+
+| Component | Implementation |
+| --- | --- |
+| Controller | AlertConfigController |
+| Service | AlertConfigService |
+| View | Views/AlertConfig/Index.cshtml |
+| JavaScript | js/AlertConfig.js |
+| Stylesheet | Styles/AlertConfig.css |
+| Authentication | Session-Based |
+| Authorization | Role-Based |
+| Audit Logging | Supported |
+| Query Logging | Supported |
+| Transaction Support | Supported |
+
+### 4.5 Alert Schedule Management
+
+Responsible for scheduling alert execution.
+
+### 4.5.1 Capabilities
+
+- Configure execution schedules
+- Manage recipients
+- Configure To, CC, and BCC users
+- Define execution frequency
+- Manage next execution dates
+- Support recurring alert delivery
+
+### 4.5.2 Architectural Components
+
+| Component | Implementation |
+| --- | --- |
+| Controller | AlertScheduleController |
+| Service | AlertSchdeuleService |
+| View | Views/AlertSchedule/Index.cshtml |
+| JavaScript | js/AlertSchedule.js |
+| Stylesheet | Styles/AlertSchedule.css |
+| Authentication | Session-Based |
+| Authorization | Role-Based |
+| Audit Logging | Supported |
+| Query Logging | Supported |
+| Transaction Support | Supported |
+
+### 4.6 Alert Attachment Management
+
+Responsible for managing files associated with alerts.
+
+### 4.6.1 Capabilities
+
+- Configure attachment settings
+- Manage attachment URLs
+- Configure attachment file types
+- Associate attachments with alerts
+- Control attachment delivery behavior
+
+### 4.6.2 Architectural Components
+
+| Component | Implementation |
+| --- | --- |
+| Controller | AlertConfigAttachmenController |
+| Service | AlertConfigAttachmentService |
+| View | Views/AlertConfigAttachment/Index.cshtml |
+| JavaScript | js/AlertConfigAttachment.js |
+| Stylesheet | Styles/AlertConfigAttachmentcss |
+| Authentication | Session-Based |
+| Authorization | Role-Based |
+| Audit Logging | Supported |
+| Query Logging | Supported |
+| Transaction Support | Supported |
+
+### 4.7 Company Configuration Management
+
+Responsible for centralized application and business configuration management.
+
+### 4.7.1 Capabilities
+
+- Manage company-level settings
+- Store configuration values
+- Maintain business parameters
+- Configure environment-specific values
+- Manage application settings
+- Centralize configurable system behavior
+
+### 4.7.2 Architectural Components
+
+| Component | Implementation |
+| --- | --- |
+| Controller | CompanyConfigController |
+| Service | CompanyConfigService |
+| View | Views/CompanyConfig/Index.cshtml |
+| JavaScript | js/CompanyConfig.js |
+| Stylesheet | Styles/CompanyConfig.css |
+| Authentication | Session-Based |
+| Authorization | Role-Based |
+| Audit Logging | Supported |
+| Query Logging | Supported |
+| Transaction Support | Supported |
+
+### 4.8 User Management
+
+The User Management module provides centralized administration of application users, authentication credentials, account status, role assignments, and password management. It replaces manual XML-based user administration by offering a secure web interface for managing the complete user lifecycle while maintaining compatibility with the XML-based authentication framework.
+
+In addition to standard CRUD operations, the module integrates account activation, role assignment, authentication support, administrative password management, and audit logging to provide a secure, maintainable, and enterprise-ready identity administration solution.
+
+The module serves as the central repository for application identity management and is closely integrated with the Authentication, Authorization, Audit Logging, and XML Configuration subsystems.
+
+### 4.8.1 Capabilities
+
+- Create new user accounts
+- Update user profile information
+- Administrative password reset
+- Plain-text password storage (no encryption, hashing, or salt)
+- Activate and deactivate user accounts
+- Soft delete user accounts
+- Assign and modify user roles
+- Maintain password change metadata
+- Support XML-based user synchronization
+- Search, sort, and paginate user records
+- Inline grid-based editing
+- Role-based administrative controls
+- Authentication support through UserService
+- Audit logging of administrative operations
+
+### 4.8.2 Responsibilties
+
+The User Management module is responsible for maintaining application identity information and coordinating user-related operations across multiple architectural layers.
+
+Responsibilities include:
+
+- Managing user account lifecycle
+- Maintaining user authentication credentials
+- Enforcing password management policies
+- Assigning application roles
+- Managing account activation status
+- Coordinating password reset operations
+- Synchronizing XML user repository updates
+- Supporting authentication services
+- Recording audit information for administrative changes
+- Validating user management requests
+
+### 4.8.3 Architectural Components
+
+| Component | Implementation |
+| --- | --- |
+| Controller | UserController |
+| Service | UserService |
+| View | Views/User/Index.cshtml |
+| JavaScript | js/UserMaster.js |
+| Stylesheet | Styles/UserMaster.css |
+| Authentication | Session Based |
+| Authorization | Role Based |
+| Audit Logging | Supported |
+| Transaction Support | Supported |
+
+### 4.8.4 User Account Lifecycle
+
+```
+New User
+
+↓
+
+Create Account
+
+↓
+
+Assign Role
+
+↓
+
+Set Password
+
+↓
+
+Activate Account
+
+↓
+
+Authenticate
+
+↓
+
+Password Change
+
+↓
+
+Deactivate
+
+↓
+
+Soft Delete
+```
+
+### 4.8.5 Password Lifecycle
+
+```
+Password Created
+
+↓
+
+Store Plain-Text Password
+
+↓
+
+Authenticate
+
+↓
+
+Password Change
+
+↓
+
+Update PasswordChangedOn
+```
+
+### 4.8.6 User Management Features
+
+| Feature | Description |
+| --- | --- |
+| User Provisioning | Creates new application users |
+| Role Assignment | Assigns application roles |
+| Password Management | Administrative password reset |
+| Account Activation | Enables or disables login |
+| Authentication Support | UserService integration |
+| Password Storage | Plain-text value stored in Users.xml |
+| Audit Logging | Administrative audit history |
+| Search & Filtering | Grid search and pagination |
+| XML Synchronization | Updates Users.xml |
+| Inline Editing | AJAX-based editing |
+
+---
+
+### 4.9 Dynamic Code Module
+
+The Dynamic Code module allows administrators to write, compile, and store C# code snippets from Report. These snippets are intercepted and executed at runtime by the ERP application, enabling endpoint behavior to be overridden without modifying or redeploying the ERP.
+
+Report is the authoring tool. The ERP is the execution environment. The two applications share the same database and communicate exclusively through the `CustomCode` table.
+
+#### 4.9.1 Capabilities
+
+- Grid-based management of runtime code overrides with search, sort, and pagination
+- Inline Monaco editor (monaco-editor 0.45.0 via CDN) with C# syntax, keyword/class autocomplete, dot-completion, and method signature help
+- Namespace autocomplete while authoring (suggestion tree built from loaded assemblies)
+- Server-side compilation on save using the RSuite DynamicCodeExecutor
+- Full audit trail: before-image JSON snapshot is logged for every UPDATE and DELETE
+- Deleted Records viewer integration (opens AuditTrail/AuditLogs.cshtml with AuditTableName = CustomCode)
+
+#### 4.9.2 Architectural Components
+
+| Component | Implementation |
+| --- | --- |
+| Controller | DynamicCodeController |
+| Service | DynamicCodeService + CustomCodeDAL |
+| View | Views/DynamicCode/Index.cshtml, Views/DynamicCode/IDE.cshtml |
+| Shared Views | Shared/_CodeEditor.cshtml (Monaco), Shared/_NamespaceEditor.cshtml |
+| JavaScript | js/DynamicCode.js |
+| Stylesheet | Styles/DynamicCode.css |
+| Authentication | Session-Based |
+| Authorization | Role-Based |
+| Audit Logging | Supported |
+| Query Logging | Supported |
+| Transaction Support | Supported |
+
+**Table: CustomCode**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| CustomCodeId | int (PK) | Auto-increment identity; shown as "Code ID" in the grid |
+| ControllerName | nvarchar | Controller to intercept (e.g., VehicleCallBack) |
+| ActionName | nvarchar | Action to intercept (e.g., GetVehicleModelOnManufacturer) |
+| Namespaces | nvarchar | Comma-separated using namespaces for compilation |
+| CustomCode | nvarchar(max) | C# code body — must return a JsonResult |
+| Description | nvarchar | Human-readable purpose of the override |
+
+There is **no `HttpMethod` column** — the ERP matches by controller + action name only.
+
+Controllers:
+
+- DynamicCodeController
+  - Index (GET) — grid page; sets ViewBag.AuditTableName = "CustomCode", ViewBag.RecordIdLabel = "Code ID"
+  - SaveChanges (POST) — inline grid save with temp-ID mapping
+  - SaveCode (POST) — compiles via RSuite DynamicCodeExecutor, then SaveCodeFromIDEAsync
+  - GetCode (GET) — returns a row as JSON for the inline IDE panel
+  - Delete (POST) — delete with audit capture
+  - LoadClassesFromNamespaces (POST) — type names for Monaco autocomplete
+- NameSpaceController — Suggest (GET) namespace/class suggestions; NamespaceEditor partial
+- IntellisenseController — Completions (POST) dot-completion; Signatures (POST) method signature help; CodeEditor partial
+
+Services:
+
+- DynamicCodeService — GetAllAsync (in-memory sort/pagination), SaveChangesAsync, DeleteAsync, SaveCodeFromIDEAsync, GetByControllerActionAsync
+- CustomCodeDAL — CRUD for the CustomCode table
+
+Views:
+
+- Views/DynamicCode/Index.cshtml — grid + inline IDE panel (#ideSection) + audit/Deleted Records handlers
+- Views/DynamicCode/IDE.cshtml — standalone IDE fallback page
+- Views/Shared/_CodeEditor.cshtml — Monaco editor partial with 3 IntelliSense providers
+- Views/Shared/_NamespaceEditor.cshtml — namespace entry with suggestion list
+
+Client-side: js/DynamicCode.js (showIDE, hideIDE, clearIDE, loadClassesForNamespaces, grid handlers). Styling: Styles/DynamicCode.css (grid + IDE panel).
+
+Namespace handling on save (DynamicCodeController.SaveCode):
+
+- System.Collections.Generic is excluded from the persisted Namespaces value (the compiler header already includes it)
+- Report.* namespaces are excluded (Report's own assemblies cannot be resolved by the ERP runtime process)
+- gacList: System.Web.dll, Microsoft.CSharp.dll
+
+#### 4.9.3 Runtime Execution Model
+
+```
+HTTP Request to ERP controller/action
+  → Global.asax.cs Application_BeginRequest
+    → CallBackService.IsDynamicActionPresent(url)
+        → GetByControllerAction(controller, action)   # controller + action only, no HTTP verb
+        → on match: rewrite URL to DynamicCallBack/Execute
+    → CallBackService.Execute
+        → read Namespaces + CustomCode from CustomCode table
+        → CompilerService.Compile(code, namespaces)   # recompiled EVERY request, no cache
+        → Activator.CreateInstance → MethodInfo.Invoke
+        → result written to HTTP response
+```
+
+Because every request is recompiled, a snippet saved in Report is active on the very next ERP request.
+
+Code body requirement — the generated wrapper class is NOT a Controller, so the Json() helper does not exist:
+
+```
+✗ WRONG — "The name 'Json' does not exist in the current context"
+return Json(new { data = "value" });
+
+✓ CORRECT — explicit JsonResult construction
+return new JsonResult
+{
+    Data = new { ProductModelCollection = new[] { new { Id = 1, label = "DYNAMIC MODEL" } } },
+    JsonRequestBehavior = JsonRequestBehavior.AllowGet
+};
+```
+
+Verified override: VehicleCallBack / GetVehicleModelOnManufacturer returns ProductModelCollection with a single DYNAMIC MODEL option, visible in the Vehicle Model dropdown on the ERP Vehicle master page (new-record form).
+
+#### 4.9.4 Audit Integration
+
+- UPDATE: before-image JSON captured via Dal.GetRowAsJsonAsync(DynamicCodeTable, "CustomCodeId", id) → AuditLogService.LogChangeAsync writes to com_mst_audit_log
+- DELETE: same before-image capture; the audit write is wrapped in try/catch so a completed delete is never rolled back by an audit failure
+- The grid exposes an inline Deleted Records button opening AuditTrail/AuditLogs.cshtml with AuditTableName = CustomCode, RecordIdLabel = Code ID
+
+#### 4.9.5 Known Issues
+
+| # | Issue | Impact | Location |
+|---|-------|--------|----------|
+| 1 | SaveCode persists broken code | Compile-failed snippet is still saved and activated in the ERP | DynamicCodeController.cs (compile result never checked before save) |
+| 2 | CustomCodeDAL hardcodes SqlClient | Dynamic Code fails on MySQL (GEETEE) | CustomCodeDAL.cs (bypasses DbProviderFactory) |
+| 3 | Matching without HTTP verb | GET and POST to the same controller/action cannot be overridden independently | CallBackService (ERP) |
+| 4 | Monaco loaded from CDN | IDE unavailable without internet access | Views/Shared/_CodeEditor.cshtml |
+| 5 | No sandbox | Snippets run with full process privileges, gated only by role | Dynamic Code execution path |
+
+---
+
+# 5. Transaction Management
+
+## 5.1 Overview
+
+The Report Management System implements transaction-based processing to ensure that all create, update, and delete operations execute reliably while preserving database consistency across supported database providers.
+
+Every database modification request passes through a standardized processing pipeline consisting of authentication, authorization, business validation, transaction management, audit logging, query logging, and exception handling before the transaction is committed.
+
+The transaction framework guarantees that each operation either completes successfully or is rolled back entirely, preventing partial updates and maintaining referential integrity across all managed business entities.
+
+Transaction management is implemented within the Data Access Layer through reusable transaction methods that support both SQL Server and MySQL database providers using a common programming model.
+
+## 5.2 Transaction Processing Flow
+
+### 5.2.1 Transaction Lifecycle
+
+```
+User Request
+      │
+      ▼
+Authentication Validation
+      │
+      ▼
+Authorization Check
+      │
+      ▼
+Business Validation
+      │
+      ▼
+Open Database Connection
+      │
+      ▼
+Begin Transaction
+      │
+      ▼
+Execute Database Operation
+      │
+      ▼
+Capture Audit Snapshot
+      │
+      ▼
+Write Query Log
+      │
+      ▼
+Operation Successful?
+      │
+ ┌────┴─────┐
+ │          │
+ ▼          ▼
+Commit   Rollback
+ │          │
+ ▼          ▼
+Return Success / Error Response
+```
+
+## 5.3 Transaction Benefits
+
+| Benefit | Description |
+| --- | --- |
+| Data Integrity | Prevents inconsistent database states |
+| Atomic Operations | All changes succeed or fail together |
+| Error Recovery | Automatic rollback on failures |
+| Consistency | Ensures business rules remain valid |
+| Reliability | Protects against unexpected interruptions |
+| Audit Accuracy | Guarantees accurate logging of successful operations |
+| Benefit | Description |
+| Complete Traceability | All database modifications are recorded in audit history and XML logs. |
+| Operational Diagnostics | Executed SQL statements can be reviewed through Query Logs. |
+| Exception Tracking | Runtime failures are preserved for investigation through Error Logs. |
+
+## 5.4 Transaction Implementation
+
+Transaction processing is handled within the Data Access Layer through controlled database transaction objects.
+
+Key capabilities include:
+
+- Begin Transaction
+- Commit Transaction
+- Rollback Transaction
+- Exception Handling
+- Audit Logging Integration
+- Query Logging Integration
+
+The implementation remains database-independent and works consistently for both SQL Server and MySQL providers.
+
+## 5.5 Transaction Implementation
+
+Transaction management is implemented within the `Dal` class and is shared by all business services.
+
+### Core Transaction Methods
+
+- BeginTransaction()
+- Commit()
+- Rollback()
+
+### Internal Components
+
+- _currentConnection
+- _currentTransaction
+
+### Responsibilities
+
+- Open database connections
+- Begin database transactions
+- Commit successful operations
+- Roll back failed operations
+- Dispose transaction resources
+- Release database connections
+
+This implementation ensures consistent transaction behavior across SQL Server and MySQL while allowing business services to remain independent of provider-specific transaction APIs.
+
+---
+
+# 6. Cross Database Support
+
+## 6.1 Overview
+
+The Report Management System supports runtime connectivity to multiple SQL Server and MySQL databases through a provider-based database abstraction architecture.
+
+Instead of relying on statically configured database connections, users select the target database during authentication. The selected connection information is stored within the user session and is subsequently used by the Data Access Layer for all database operations.
+
+This design enables a single application deployment to manage multiple database environments without requiring separate builds, configuration changes, or application restarts.
+
+Database selection occurs during authentication and remains active throughout the authenticated user session.
+
+## 6.2 Database Provider Architecture
+
+The Data Access Layer implements a provider-independent architecture through the `IDal` interface and `Dal` implementation.
+
+At runtime, the database provider is selected according to the authenticated user's session.
+
+Supported providers include:
+
+- Microsoft SQL Server
+- MySQL
+
+Provider-specific functionality such as connection objects, pagination syntax, identity retrieval, parameter creation, and SQL generation is handled internally by the Data Access Layer while exposing a unified interface to business services.
+
+## 6.3 Configuration-Based Database Selection
+
+Database environments are maintained through the `App_Data/DbConnection.xml` configuration file.
+
+Each connection entry defines:
+
+- Connection Name
+- Connection String
+- Database Provider Type
+
+During user authentication:
+
+1. User selects a database connection.
+2. The selected connection is validated.
+3. Connection information is stored in the ASP.NET Session.
+4. The Data Access Layer retrieves the session values for every request.
+5. Appropriate provider-specific database objects are created dynamically.
+
+This architecture enables runtime database switching without recompilation or application redeployment.
+
+## 6.4 Session-Based Database Resolution
+
+The application resolves database connectivity dynamically using values stored within the authenticated user's session.
+
+### Session Variables Used
+
+| Session Variable | Purpose |
+| --- | --- |
+| ConnectionString | Active database connection string |
+| DbType | Database provider (MYSQL / SQLSERVER) |
+| CompanyCode | Friendly database name shown within the user interface |
+
+For every incoming request, the Data Access Layer retrieves these values before creating database connections.
+
+This design allows multiple users to connect to different database environments simultaneously without affecting one another.
+
+## 6.5 Cross-Database Benefits
+
+| Benefit | Description |
+| --- | --- |
+| Database Independence | Application logic remains unchanged |
+| Flexible Deployment | Supports different client environments |
+| Reduced Maintenance | Single codebase supports multiple databases |
+| Simplified Migration | Easier transition between database platforms |
+| Scalability | Supports future database expansion |
+| Cost Optimization | Organizations can choose preferred database engines |
+
+## 6.6 Database Provider Features
+
+The provider-based architecture encapsulates all provider-specific behavior inside the Data Access Layer.
+
+Capabilities include:
+
+- Provider Factory selection
+- Dynamic connection creation
+- Provider-specific SQL syntax generation
+- Pagination handling
+- Identity retrieval
+- Parameter creation
+- Transaction management
+
+The business layer remains completely independent of the underlying database provider.
+
+## 6.7 Dynamic Code Cross-Database Limitation
+
+The main data access path (IDal/Dal) is provider-agnostic through DbProviderFactory, but CustomCodeDAL is the exception:
+
+- CustomCodeDAL instantiates System.Data.SqlClient types directly and does not consult the session-selected DbType
+- Consequence: Dynamic Code works on SQL Server environments but fails on MySQL (GEETEE) with a provider/type error as soon as the Dynamic Code screen queries the CustomCode table
+- Intended fix: mirror the GetFactory() provider switch (MYSQL → MySqlClientFactory.Instance, SQLSERVER → SqlClientFactory.Instance) inside CustomCodeDAL, resolving the provider from the session DbType
+
+# 7. XML Configuration Architecture
+
+## 7.1 Overview
+
+The Report Management System centralizes authentication, authorization, and database connectivity through XML-based configuration files. This approach enables administrative changes without requiring application recompilation.
+
+## 7.2 Users.xml
+
+The `Users.xml` file stores application user accounts.
+
+Each user record contains:
+
+- UserId
+- Username
+- Password
+- DisplayName
+- Role
+
+The UserService validates credentials by reading this file during login.
+
+### 7.2.1 Example XML Structure
+
+Users.xml acts as the centralized identity repository for the application. Each user record contains authentication, authorization, and account lifecycle information required during the login process. Passwords are stored in plain text; the application does not apply encryption, hashing, or salt.
+
+```xml
+<Users>
+<User>
+<UserId />
+<Username />
+<DisplayName />
+<Password />
+<Role />
+<IsActive />
+<CreatedOn />
+<PasswordChangedOn />
+</User>
+</Users>
+```
+
+### 7.2.2.XML Element Description
+
+| Element | Purpose |
+| --- | --- |
+| UserId | Unique identifier of the user |
+| Username | Login username |
+| DisplayName | User-friendly display name |
+| Password | Plain-text login password |
+| Role | Assigned application role |
+| IsActive | Determines whether login is permitted |
+| CreatedOn | User creation timestamp |
+| PasswordChangedOn | Last password modification timestamp |
+
+## 7.3 Password Related Configuration
+
+| Setting | Purpose |
+| --- | --- |
+| UsersXmlPath | User repository |
+| RolesXmlPath | Role repository |
+
+## 7.4 Roles.xml
+
+Role definitions are maintained within `Roles.xml`.
+
+Each role specifies:
+
+- Accessible Controllers
+- Allowed Actions
+- Restricted Actions
+
+The RoleService evaluates these permissions for every secured request.
+
+### 7.4.1 Example XML Structure
+
+```xml
+<Roles>
+<Role>
+<Name />
+<Controllers>
+<Controller />
+</Controllers>
+<Actions>
+<Action />
+</Actions>
+</Role>
+</Roles>
+```
+
+### 7.4.2.XML Element Description
+
+| Element | Purpose |
+| --- | --- |
+| Name | Role name |
+| Controllers | Controllers accessible by the role |
+| Controller | Individual controller permission |
+| Actions | Allowed actions |
+| Action | Individual action permission |
+
+## 7.5 DbConnection.xml
+
+The database catalog is maintained within `DbConnection.xml`.
+
+Each connection defines:
+
+- Connection Name
+- Connection String
+- Database Provider
+
+Users select one of these connections during authentication.
+
+### 7.5.1 Example XML Structure
+
+```xml
+<Connections>
+<Database>
+<DatabaseId />
+<DatabaseName />
+<DbType />
+<ConnectionString />
+<CompanyCode />
+<IsDefault />
+</Database>
+</Connections>
+```
+
+### 7.5.2.XML Element Description
+
+| Element | Purpose |
+| --- | --- |
+| DatabaseId | Unique database identifier |
+| DatabaseName | Friendly database name |
+| DbType | SQL Server or MySQL |
+| ConnectionString | Database connection string |
+| CompanyCode | Associated company identifier |
+| IsDefault | Indicates default database |
+
+## 7.6 Benefits
+
+The XML configuration architecture provides:
+
+- Centralized administration
+- Environment flexibility
+- Runtime database switching
+- Simplified deployment
+- Easy user administration
+- Role-based security management
+- Reduced configuration complexity
+
+---
+
+# 8. Data Processing & Audit Architecture
+
+## 8.1 Data Processing Lifecycle
+
+The Report Management System follows a controlled data processing architecture in which every business operation passes through authentication, authorization, validation, transaction management, audit logging, query logging, and database persistence before a response is returned to the user.
+
+All CRUD operations follow a standardized processing pipeline to ensure consistent business rule enforcement, transactional integrity, operational traceability, and historical record preservation across all supported business modules.
+
+Each business request is processed independently, allowing failures to be isolated without affecting other records while maintaining complete audit visibility throughout the application lifecycle.
+
+### 8.1.1 Request Processing Flow
+
+```
+Authenticated User Action
+      │
+      ▼
+Authentication
+      │
+      ▼
+Authorization
+      │
+      ▼
+Load Business Module
+      │
+      ▼
+Client Validation
+      │
+      ▼
+MVC Controller
+      │
+      ▼
+Business Service
+      │
+      ▼
+Begin Transaction
+      │
+      ▼
+Execute Database Operation
+      │
+      ▼
+Capture Audit Snapshot
+      │
+      ▼
+Write Query Log
+      │
+      ▼
+Commit Transaction
+      │
+      ▼
+Return JSON / View
+      │
+      ▼
+Refresh User Interface
+```
+
+### 8.1.2 Processing Stages
+
+| Stage | Description |
+| --- | --- |
+| Record Selection | User selects a record from the grid |
+| Edit Form Loading | Complete record information is loaded into the edit form |
+| Validation | Client-side and server-side validations are executed |
+| Business Processing | Service layer applies business rules |
+| Transaction Execution | Database operation executes within a transaction |
+| Audit Capture | Previous record state is captured before modification |
+| Commit/Rollback | Changes are committed or rolled back |
+| Response Handling | Success or failure response returned to UI |
+
+## 8.2 Record Save Architecture
+
+Every create, update, and delete request processes a single business entity at a time.
+
+The save workflow follows the sequence below:
+
+```
+Load Record
+			↓
+Validate User Session
+			↓
+Validate User Permissions
+			↓
+Validate Business Rules
+			↓
+Capture Previous Record State
+			↓
+Begin Database Transaction
+			↓
+INSERT / UPDATE / DELETE
+			↓
+Create Audit Log
+			↓
+Write Query Log
+			↓
+Commit Transaction
+			↓
+Return Success Response
+```
+
+### 8.2.2 Benefits
+
+| Benefit | Description |
+| --- | --- |
+| Simplicity | Easier processing and maintenance |
+| Reliability | Reduced transaction complexity |
+| Audit Accuracy | Clear record-level audit history |
+| Error Isolation | Failures impact only one record |
+| Easier Recovery | Simplified rollback process |
+
+### 8.3 User Management Endpoints
+
+The User Management module exposes dedicated controller endpoints for user administration operations. These endpoints are invoked through AJAX requests from the User Management interface and enforce authentication, authorization, validation, and audit logging before executing business operations.
+
+### 8.3.1 User Administration Endpoints
+
+| Operation | Endpoint | HTTP Method | Description |
+| --- | --- | --- | --- |
+| List Users | `/User/Index` | GET | Retrieves the User Management view and displays the user grid. |
+| Save User | `/User/SaveChanges` | POST | Creates a new user or updates an existing user based on the submitted request. |
+| Delete User | `/User/Delete` | POST | Soft deletes the selected user after permission validation. |
+| Toggle Account Status | `/User/ToggleActive` | POST | Activates or deactivates a user account without deleting the record. |
+
+All user administration requests are processed through the UserController before being delegated to the UserService. Each operation performs session validation, role authorization, business validation, XML repository updates, audit logging, and exception handling prior to returning a JSON response to the client.
+
+---
+
+# 9. Audit Logging Architecture
+
+## 9.1 Overview
+
+The Report Management System implements a comprehensive audit logging framework that records historical information for every UPDATE and DELETE operation performed through the administrative interface.
+
+Before any database record is modified or removed, the existing row is captured and serialized into JSON format before being stored within the audit repository.
+
+The audit framework provides historical visibility, operational transparency, troubleshooting support, and recovery capabilities while maintaining minimal impact on business processing.
+
+## 9.2 Audit Processing Flow
+
+```
+User Updates Record
+			↓
+Authentication
+			↓
+Authorization
+			↓
+Retrieve Existing Record
+			↓
+Convert Record To JSON
+			↓
+Begin Transaction
+			↓
+Execute Database Operation
+			↓
+Insert Audit Record
+			↓
+Commit Transaction
+		  ↓
+Return Success
+```
+
+## 9.3 Audit Data Captured
+
+The audit system stores the complete state of a record before modification.
+
+### Information Captured
+
+| Field | Description |
+| --- | --- |
+| AuditLogId | Primary audit identifier |
+| TableName | Source database table |
+| RecordId | Primary key of affected record |
+| OperationType | INSERT, UPDATE or DELETE |
+| OldValues | JSON representation of previous record values |
+| CreatedOn | Audit timestamp |
+| CreatedBy | Username obtained from authenticated session |
+
+## 9.4 Audit Viewer
+
+Audit information is accessible through a dedicated side-panel interface integrated into each administrative module.
+
+The viewer allows administrators to review historical modifications without leaving the current management screen.
+
+### Available Views
+
+- Record Audit History
+- Deleted Records
+- Historical JSON Snapshots
+- Change Timeline
+
+The audit viewer is loaded through an iframe-based side panel to provide seamless navigation while preserving the user's current context.
+
+## 9.5 Audit Viewer Architecture
+
+```
+Administrative Module
+          ↓
+Audit Button
+          ↓
+AuditTrail Controller
+          ↓
+Audit Service
+          ↓
+Audit Database Table
+          ↓
+Audit Viewer
+```
+
+### 9.5.1 Audit Components
+
+| Component | Responsibility |
+| --- | --- |
+| AuditTrailController | Handles audit-related HTTP requests |
+| AuditLogService | Creates and retrieves audit records |
+| AuditLogs View | Displays historical modifications |
+| DeletedRecords View | Displays deleted entity history |
+| Audit Database Table | Stores serialized audit records |
+| Session Context | Provides CreatedBy information |
+
+### 9.5.2 Audit Endpoints
+
+The audit module exposes dedicated controller actions for retrieving audit information.
+
+| Endpoint | Purpose |
+| --- | --- |
+| AuditLogs | Displays paginated audit history |
+| GetAuditLogs | Returns audit history as JSON |
+| DeletedRecords | Displays deleted record history |
+
+These endpoints are utilized throughout the application by the embedded audit side-panel integrated into each CRUD module.
+
+### 9.5.3 Audit Benefits
+
+| Benefit | Description |
+| --- | --- |
+| Regulatory Compliance | Historical data retention |
+| Troubleshooting | Analyze previous record states |
+| Data Recovery | Restore deleted information |
+| Change Visibility | Understand system modifications |
+| Operational Transparency | Full audit trail availability |
+| Risk Reduction | Protection against accidental changes |
+
+The audit architecture ensures that all critical business data modifications remain traceable, recoverable, and historically accessible throughout the lifecycle of the application.
+
+## 9.6 Dynamic Code Audit Integration
+
+- Grid UPDATE and DELETE operations follow the same audit pattern as every business module: before-image JSON snapshot → com_mst_audit_log
+- DELETE audit capture is wrapped in a try/catch — a completed delete is never rolled back due to audit failure
+- The Dynamic Code grid provides a Deleted Records button that opens the audit viewer filtered to the CustomCode table (AuditTableName = CustomCode, RecordIdLabel = Code ID)
+
+---
+
+# 10. Query and Error Logging
+
+## 10.1 Overview
+
+The Report Management System implements XML-based operational logging to record executed SQL statements and unexpected runtime exceptions.
+
+The logging framework provides administrators with complete visibility into application behavior and greatly simplifies troubleshooting during development and production support.
+
+---
+
+## 10.2 Query Logger
+
+QueryLogger records successful INSERT, UPDATE, and DELETE statements executed through the Data Access Layer.
+
+### 10.2.1 Responsibilities
+
+- Log executed SQL
+- Record execution timestamp
+- Capture authenticated username
+- Capture active database
+- Generate daily XML log files
+
+### 10.2.2 Log Location
+
+App_Data/QueryLogs/
+
+## 10.3 Error Logger
+
+ErrorLogger records exceptions encountered during database operations.
+
+Captured information includes:
+
+- Exception Message
+- Stack Trace
+- Executed SQL
+- User
+- Database
+- Timestamp
+
+### 10.3.1 Log Location
+
+App_Data/ErrorLogs/
+
+---
+
+## 10.4 Logging Architecture
+
+```
+Business Service
+
+↓
+
+DAL
+
+↓
+
+Execute SQL
+
+↓
+
+Success?
+
+↓
+
+YES ---------------- NO
+
+↓                   ↓
+
+QueryLogger     ErrorLogger
+
+↓                   ↓
+
+XML Log Files
+```
+
+---
+
+## 10.5 Logging Characteristics
+
+The logging framework provides:
+
+- XML-based storage
+- Thread-safe file writing
+- Daily log rotation
+- User tracking
+- Database tracking
+- Query history
+- Exception history
+
+---
+
+## 10.6 Benefits
+
+- Simplified troubleshooting
+- Operational transparency
+- Easier production support
+- SQL execution history
+- Error diagnosis
+- Improved maintainability
+
+---
+
+# 11. Authentication & Authorization
+
+## 11.1 Overview
+
+The Report Management System implements a centralized authentication and authorization framework to protect administrative functionality and ensure that only authenticated users can access application resources.
+
+The security framework combines XML-based user management, role-based authorization, session management, and runtime database selection to provide secure access across multiple database environments.
+
+Authentication validates user credentials, while authorization determines the operations each authenticated user is permitted to perform throughout the application.
+
+---
+
+## 11.2 Authentication Architecture
+
+Authentication is implemented using XML-based user storage and session-based identity management.
+
+### Authentication Components
+
+| Component | Responsibility |
+| --- | --- |
+| Users.xml | Stores application users |
+| UserService | Validates user credentials |
+| HomeController | Processes login and logout requests |
+| ASP.NET Session | Stores authenticated user context |
+| LoginAuthorizeAttribute | Protects secured resources |
+
+## 11.3 XML-Based User Management
+
+Application users are maintained within the **Users.xml** configuration file.
+
+Each user record contains:
+
+- UserId
+- Username
+- Password
+- DisplayName
+- Role
+
+The UserService validates user credentials by comparing the supplied username and password against the XML configuration.
+
+Passwords are intentionally stored in plain text based on current project requirements. Future releases should migrate to hashed password storage using a secure password hashing algorithm.
+
+## 11.4 Plain-Text Password Storage
+
+Passwords are deliberately stored and compared as plain text. The previous implementation used PBKDF2 password hashing with random cryptographic salts (via the .NET `Rfc2898DeriveBytes` class), but that encryption and salting was removed from the application (commit 61056dc) — no hashing, salt generation, or encryption is applied today.
+
+During authentication, `UserService.ValidateUserAsync` simply compares the supplied password directly against the plain-text `<Password>` value stored in `Users.xml`. The same direct comparison is used for password changes and administrative password resets.
+
+This plain-text approach is a known security limitation (see 14.1). Future releases should migrate to a secure password hashing scheme — for example by adopting ASP.NET Identity with built-in PBKDF2/BCrypt hashing — without changing the login workflow.
+
+## 11.5 Login Process
+
+The login process performs the following sequence:
+
+1. User enters Username and Password.
+2. User selects the target database connection.
+3. HomeController receives the login request.
+4. UserService validates credentials.
+5. Selected database configuration is loaded.
+6. Authentication session is created.
+7. User is redirected to the application dashboard.
+
+Authentication failure returns the login page with validation messages while preserving the previously entered username and selected database connection.
+
+## 11.5.1 Login Authentication Flow
+
+```
+User
+        │
+        ▼
+Login Page (Home/Index)
+        │
+        ▼
+Enter Username
+Password
+Database Connection
+        │
+        ▼
+HomeController.Login()
+        │
+        ▼
+UserService.ValidateUserAsync()
+        │
+        ▼
+Load Users.xml
+        │
+        ▼
+Locate User Record
+        │
+        ▼
+Is User Active?
+        │
+ ┌──────┴───────┐
+ │              │
+No             Yes
+ │              │
+ ▼              ▼
+Reject Login    Verify Password
+                    │
+                    ▼
+        Direct Plain-Text Comparison
+                    │
+                    ▼
+                    Continue
+                    │
+                    ▼
+Load Selected Database
+(DbConnection.xml)
+                    │
+                    ▼
+Create ASP.NET Session
+                    │
+                    ▼
+Redirect to Dashboard
+```
+
+### 11.5.2 Authentication Processing Stages
+
+| Stage | Description |
+| --- | --- |
+| Login Request | User submits credentials and selected database. |
+| Request Processing | HomeController receives the login request. |
+| User Lookup | UserService loads Users.xml and locates the requested user. |
+| Account Validation | The user's IsActive status is verified before authentication continues. |
+| Password Verification | The supplied password is compared directly against the plain-text value stored in Users.xml. |
+| Database Resolution | The selected database connection is loaded from DbConnection.xml. |
+| Session Initialization | Authentication and database context are stored within ASP.NET Session. |
+| Redirect | User is redirected to the application dashboard. |
+
+### 11.5.3 Session Initializaton
+
+Following successful authentication, the HomeController initializes the authenticated user session by storing identity information, role information, and database connection details. These session variables are subsequently used by the authorization framework, Data Access Layer, and business services throughout the user's authenticated session.
+
+## 11.6 Password Change Management
+
+The application provides two independent password management workflows.
+
+### 11.6.1 Self-Service Password Change Architecture
+
+The Report Management System allows authenticated users to change their own passwords through the `AccountController`. The password change process verifies the user's existing credentials before storing the new plain-text password.
+
+Password updates are processed entirely within the `UserService`, ensuring that validation, XML persistence, and audit logging remain centralized within the business layer.
+
+The password change workflow consists of the following processing stages.
+
+```
+Authenticated User
+        │
+        ▼
+AccountController.ChangePassword()
+        │
+        ▼
+Validate Current Password
+        │
+        ▼
+Validate Password Policy
+        │
+        ▼
+Store New Plain-Text Password
+        │
+        ▼
+Update Users.xml Repository
+        │
+        ▼
+Update PasswordChangedOn Timestamp
+        │
+        ▼
+Create Password Audit Entry
+        │
+        ▼
+Return Success Response
+```
+
+### 11.6.2 Password Validation Rules
+
+Before a password change is accepted, the business layer validates several security requirements to ensure password integrity and prevent accidental credential changes.
+
+Validation includes:
+
+- Current password must be correct.
+- New password must satisfy the minimum password length.
+- New password and confirmation password must match.
+- New password must differ from the current password.
+- User account must be active.
+
+### 11..3 Administrative Password Reset Architecture
+
+System administrators can reset user passwords directly from the User Management module without requiring knowledge of the user's existing password.
+
+When a password value is supplied, the UserService stores the new plain-text password, updates the XML user repository, and records the password modification timestamp.
+
+If no password is provided during user modification, the existing password remains unchanged.
+
+```
+Administrator
+        │
+        ▼
+UserController.SaveChanges()
+        │
+        ▼
+Password Provided?
+        │
+ ┌──────┴────────┐
+ │               │
+No              Yes
+ │               │
+ ▼               ▼
+Keep Existing    Store New Plain-Text
+Password         Password
+                 Update Users.xml
+                 Update PasswordChangedOn
+                 Create Audit Entry
+        │
+        ▼
+Return Success
+```
+
+## 11.7 Session Management
+
+Following successful authentication, the application creates an authenticated ASP.NET session that stores user identity and database context.
+
+### 11.7.1  Session Variables
+
+| Session Variable | Purpose |
+| --- | --- |
+| IsLoggedIn | Authentication state |
+| Username | Logged-in username |
+| DisplayName | User display name |
+| Role | User role |
+| UserId | Internal user identifier |
+| ConnectionString | Active database connection |
+| DbType | SQLSERVER or MYSQL |
+| CompanyCode | Friendly database name |
+
+These session variables remain available throughout the authenticated user session and are referenced by controllers, services, and the Data Access Layer.
+
+### 11.7.2 Session Lifecycle
+
+```
+User Login
+      │
+      ▼
+Create Session
+      │
+      ▼
+Store User Information
+      │
+      ▼
+Store Database Context
+      │
+      ▼
+Access Application
+      │
+      ▼
+Logout / Session Timeout
+      │
+      ▼
+Clear Session
+```
+
+## 11.8 Authorization Architecture
+
+Authorization is implemented through XML-based role definitions combined with a global authorization filter.
+
+Each incoming request passes through LoginAuthorizeAttribute before reaching the requested controller action.
+
+Authorization validates:
+
+- Authentication status
+- Assigned role
+- Controller access
+- Action permissions
+
+Unauthorized requests are redirected to the login page or blocked before business processing begins.
+
+## 11.9 Role Management
+
+Role definitions are maintained within the Roles.xml configuration file.
+
+The application currently supports two roles.
+
+### 11.9.1 SuperAdmin
+
+Provides unrestricted access to:
+
+- All Controllers
+- All Actions
+- Delete Operations
+- Audit History
+- Administrative Features
+
+### 11.9.2 Database Administrator
+
+Provides access to all business modules while preventing Delete operations.
+
+Delete requests are blocked both within the user interface and by the server-side authorization filter.
+
+## 11.10 Login Authorization Filter
+
+The LoginAuthorizeAttribute is registered globally through FilterConfig.
+
+Responsibilities include:
+
+- Session validation
+- Authentication verification
+- Role validation
+- Controller permission checks
+- Action permission checks
+- Unauthorized request handling
+
+All controllers except HomeController are protected by this filter.
+
+## 11.11 Role-Based User Interface
+
+The application implements authorization at both the server and presentation layers.
+
+### 11.11.1 Server-Side Security
+
+- LoginAuthorizeAttribute
+- RoleService
+- Session validation
+
+### 11.11.2 Client-Side Security
+
+- Razor conditional rendering
+- JavaScript role evaluation
+- Conditional Delete button visibility
+
+This dual-layer approach improves usability while ensuring that unauthorized requests cannot bypass server-side security.
+
+## 11.12 Login User Experience
+
+The login interface provides several usability improvements.
+
+Features include:
+
+- Custom animated database selector
+- Inline validation messages
+- Field-level animations
+- Username persistence
+- Database selection persistence
+- Automatic error clearing
+- Responsive layout
+
+These enhancements improve usability while maintaining a consistent authentication workflow.
+
+## 11.13 Session Timeout
+
+Authentication state is maintained using ASP.NET Session.
+
+By default, inactive sessions expire after approximately twenty minutes unless configured otherwise within Web.config.
+
+After expiration:
+
+- Session variables are cleared.
+- User is redirected to the login page.
+- Re-authentication is required.
+
+## 11.14 Security Benefits
+
+| Benefit | Description |
+| --- | --- |
+| XML-Based User Management | Centralized authentication configuration |
+| Role-Based Authorization | Controlled access to application functionality |
+| Dynamic Database Selection | Secure runtime database switching |
+| Session Isolation | Independent authenticated sessions |
+| Server-Side Validation | Prevents unauthorized requests |
+| UI Authorization | Improves user experience |
+| Centralized Security | Single authentication framework for all modules |
+
+---
+
+# 12. Major Enhancements Implemented
+
+The Report Management System has undergone several architectural and functional enhancements to improve security, maintainability, scalability, usability, and operational reliability. These enhancements address real-world business challenges while providing a flexible administration platform capable of supporting multiple database environments.
+
+## 12.1 Dynamic Multi-Database Support
+
+### 12.1.1 Business Challenge
+
+Different client environments required the application to work with both SQL Server and MySQL databases without maintaining separate codebases.
+
+### 12.1.2 Solution Implemented
+
+A provider-based Data Access Layer dynamically resolves the database provider and connection at runtime using the authenticated user's selected database.
+
+### 12.1.3 Technical Implementation
+
+- Provider-based DAL (`IDal` / `Dal`)
+- Runtime provider selection
+- Session-based connection resolution
+- DbConnection.xml configuration
+- SQL Server and MySQL support
+
+### 12.1.4 Benefits
+
+- Single application deployment
+- Runtime database switching
+- Reduced maintenance
+- Easier customer onboarding
+
+## 12.2 XML-Based Authentication
+
+### 12.2.1 Business Challenge
+
+The application required a lightweight authentication mechanism without introducing database dependency for user management.
+
+### 12.2.2 Solution Implemented
+
+Authentication was implemented using XML configuration files.
+
+### Technical Implementation
+
+- Users.xml
+- UserService
+- Session-based authentication
+- Login validation
+- Runtime database selection
+
+### Benefits
+
+- Centralized authentication
+- Simplified deployment
+- Easy user administration
+- Database-independent authentication
+
+## 12.3 Role-Based Authorization
+
+### 12.3.1 Business Challenge
+
+Different users required different permissions while using the administration portal.
+
+### 12.3.2 Solution Implemented
+
+XML-driven role definitions combined with a global authorization filter.
+
+### Technical Implementation
+
+- Roles.xml
+- RoleService
+- LoginAuthorizeAttribute
+- UI-based authorization
+- Server-side authorization
+
+### Benefits
+
+- Secure administrative operations
+- Controlled DELETE permissions
+- Centralized permission management
+- Improved application security
+
+## 12.4 SQL Injection Protection
+
+### 12.4.1 Business Challenge
+
+Dynamic UPDATE statements could expose SQL injection vulnerabilities.
+
+### 12.4.2 Solution Implemented
+
+Column whitelisting validates every dynamically generated SQL statement.
+
+### Benefits
+
+- Secure SQL generation
+- Reduced attack surface
+- Controlled dynamic updates
+- Improved application security
+
+---
+
+## 12.5 Full Audit Logging
+
+### 12.5.1 Business Challenge
+
+Historical record changes were unavailable.
+
+### 12.5.2 Solution Implemented
+
+The application captures the complete database row before every UPDATE and DELETE operation and stores it as JSON.
+
+### Benefits
+
+- Complete audit history
+- Deleted record recovery
+- Historical visibility
+- Regulatory compliance
+
+## 12.6 XML Query & Error Logging
+
+### 12.6.1 Business Challenge
+
+Troubleshooting production issues was difficult due to limited execution history.
+
+### 12.6.2 Solution Implemented
+
+Two centralized logging components were introduced.
+
+**QueryLogger**
+
+- Records successful INSERT
+- UPDATE
+- DELETE operations
+- XML log files
+- Daily log rotation
+
+**ErrorLogger**
+
+- Records runtime exceptions
+- Stack traces
+- Executed SQL
+- Authenticated user
+- Database environment
+
+### Benefits
+
+- Operational transparency
+- Easier debugging
+- SQL execution history
+- Production diagnostics
+
+## 12.7 Dependency Validation
+
+### 12.7.1 Business Challenge
+
+Deleting parent records could create orphaned child records.
+
+### 12.7.2 Solution Implemented
+
+Dependency validation executes before DELETE operations.
+
+### Benefits
+
+- Referential integrity
+- Safe deletion
+- Business rule enforcement
+
+## 12.8 Asynchronous Database Operations
+
+### 12.8.1 Business Challenge
+
+Synchronous ADO.NET operations reduced application scalability.
+
+### 12.8.2 Solution Implemented
+
+Database communication was migrated to async/await.
+
+### Benefits
+
+- Better scalability
+- Improved responsiveness
+- Efficient resource utilization
+
+## 12.9 Transaction-Based Processing
+
+### 12.9.1 Business Challenge
+
+Partial updates could leave inconsistent data.
+
+### 12.9.2 Solution Implemented
+
+Every create, update, and delete operation executes inside a transaction.
+
+### Benefits
+
+- Atomic processing
+- Automatic rollback
+- Reliable updates
+- Consistent database state
+
+## 12.10 Centralized Configuration Management
+
+### 12.10.1 Business Challenge
+
+Configuration settings were scattered throughout the application.
+
+### 12.10.2 Solution Implemented
+
+Application configuration is centralized using:
+
+- Users.xml
+- Roles.xml
+- DbConnection.xml
+- ReportConfig
+- Web.config
+
+### Benefits
+
+- Easier maintenance
+- Runtime flexibility
+- Simplified deployment
+- Centralized administration
+
+## 12.11 User Management Module
+
+### 12.11.1 Business Challenge
+
+Historically, application users were maintained directly within the `Users.xml` configuration file. Creating, modifying, activating, or deactivating user accounts required manual XML editing, which increased administrative effort and introduced the risk of configuration errors, inconsistent user data, and unauthorized modifications.
+
+The lack of a centralized user administration interface also made password management, role assignment, and account lifecycle management difficult to maintain as the number of users increased.
+
+### 12.11.2 Solution Implemented
+
+A dedicated **User Management module** was introduced to provide centralized administration of application users through a secure web-based interface.
+
+The module enables administrators to create, update, activate, deactivate, and manage user accounts without manually editing XML configuration files. It also integrates password management, role assignment, account status management, and audit logging into a unified administration workflow.
+
+User administration is implemented using a dedicated `UserController`, `UserService`, Razor View, JavaScript components, and XML repository integration while remaining fully compatible with the existing XML-based authentication architecture.
+
+### 12.11.3 Technical Implementation
+
+- UserController
+- UserService
+- User Master interface
+- XML repository synchronization
+- Plain-text password storage
+- Administrative password reset
+- Account activation and deactivation
+- Role assignment
+- Audit logging integration
+- AJAX-based CRUD operations
+
+### 12.11.4 Benefits
+
+- Centralized user administration
+- Simple plain-text password management
+- Simplified role assignment
+- Active and inactive account management
+- Reduced manual XML maintenance
+- Improved operational security
+- Better administrative usability
+- Complete auditability of user changes
+- Scalable identity management foundation
+
+## 12.12 Dynamic Code Module
+
+### 12.12.1 Business Challenge
+
+There was no way to override or extend ERP endpoint behavior without modifying and redeploying the ERP application.
+
+### 12.12.2 Solution Implemented
+
+- Report provides a CRUD grid plus an inline Monaco IDE where administrators author C# snippets
+- Snippets are stored in the shared CustomCode table mapped by controller + action
+- The ERP's CallBackService intercepts matching requests at runtime and executes the stored code, recompiling on every request so edits take effect immediately
+
+### Technical Implementation
+
+- DynamicCodeController / NameSpaceController / IntellisenseController; DynamicCodeService + CustomCodeDAL
+- Monaco 0.45.0 (CDN) with keyword/dot-completion and signature help via IntellisenseController
+- Compilation via the RSuite DynamicCodeExecutor; snippet bodies must construct JsonResult explicitly
+
+### Benefits
+
+- Endpoint behavior (e.g., dropdown options) can be overridden without redeploying the ERP
+- Changes propagate on the next request (recompiled per request)
+- Full audit trail on override create/update/delete
+
+---
+
+# 13. Security, Deployment & Operational Considerations
+
+## 13.1 Security Overview
+
+The Report Management System protects administrative functionality through XML-based authentication, role-based authorization, session management, validation, transactional processing, audit logging, and operational logging.
+
+These mechanisms ensure that only authenticated users can access administrative modules while preserving data integrity and complete operational traceability.
+
+## 13.2 Password Storage
+
+The Report Management System previously protected user credentials using PBKDF2 password hashing with unique cryptographic salts. That encryption and salt-based hashing was removed (commit 61056dc); the application currently stores and compares passwords as plain text.
+
+Passwords are stored in reversible, unencrypted form in `Users.xml`. This is a known security limitation (see 14.1) — no hashing, salt generation, constant-time comparison, or Base64 encoding is applied today.
+
+### 13.2.1 Password Storage Controls
+
+| Control | Description |
+| --- | --- |
+| Plain-Text Storage | Passwords stored directly in Users.xml without encryption |
+| Direct Comparison | Supplied password compared against the stored value |
+| Account Activation | IsActive flag gates login |
+| Future Improvement | Migrate to ASP.NET Identity with secure password hashing |
+
+## 13.3 Authentication Security
+
+Authentication security ensures that only valid and active users can access the application.
+
+The authentication subsystem validates user credentials through the UserService, verifies account status, performs password verification, loads the selected database connection, and establishes an authenticated ASP.NET Session.
+
+### 13.3.1 Authentication Controls
+
+| Control | Description |
+| --- | --- |
+| XML User Repository | Centralized user management |
+| Active User Validation | Prevents disabled users from logging in |
+| Password Verification | Direct comparison against the plain-text value in Users.xml |
+| Database Selection Validation | Validates selected connection |
+| Login Session Creation | Creates authenticated session |
+
+## 13.4 Authorization Security
+
+Authorization is enforced through XML-defined role permissions combined with a global authorization filter.
+
+All secured requests pass through LoginAuthorizeAttribute before reaching controller actions.
+
+### 13.4.1 Authorization Controls
+
+| Control | Description |
+| --- | --- |
+| RoleService | Permission evaluation |
+| Roles.xml | Role definitions |
+| LoginAuthorizeAttribute | Global authorization |
+| Server-side Authorization | Prevents unauthorized requests |
+| UI Authorization | Hides restricted actions |
+| SuperAdmin Bypass | Full administrative access |
+
+## 13.5 Session Security
+
+Authenticated users operate within isolated ASP.NET Sessions that maintain user identity and database context throughout the request lifecycle.
+
+Session state is cleared automatically during logout or session timeout.
+
+### 13.5.1 Session Controls
+
+| Control | Description |
+| --- | --- |
+| Session Isolation | Independent user sessions |
+| Session Timeout | Automatic expiration |
+| Session Variables | User identity and database context |
+| Logout | Session destruction |
+| Database Context | Prevents cross-database leakage |
+
+## 13.6 Audit & Logging Security
+
+Security-sensitive operations are monitored through audit logging and XML-based operational logs.
+
+Password changes, user modifications, database updates, and administrative operations are recorded for historical tracking and operational diagnostics.
+
+### 13.6.1 Audit Controls
+
+| Control | Description |
+| --- | --- |
+| Audit Trail | Historical record changes |
+| Password Change Audit | Tracks credential updates |
+| Query Logger | Executed SQL history |
+| Error Logger | Runtime exception history |
+| User Tracking | Records authenticated user |
+| Timestamping | Records operation time |
+
+## 13.7 Validation & Data Integrity
+
+Implemented validation includes:
+
+- Required field validation
+- Data type validation
+- Business rule validation
+- Dependency validation
+- Referential integrity validation
+- Transaction rollback
+- Session validation
+- Role authorization
+
+## 13.8 Deployment Requirements
+
+| Component | Requirement |
+| --- | --- |
+| IDE | Visual Studio 2022 Community |
+| Framework | .NET Framework 4.7 |
+| ASP.NET MVC | 5.2.7 |
+| Web Server | IIS |
+| Database | SQL Server / MySQL |
+| NuGet Packages | MySql.Data, Newtonsoft.Json |
+
+## 13.9 Deployment Procedure
+
+1. Build the solution.
+2. Publish the application.
+3. Deploy to IIS.
+4. Configure DbConnection.xml.
+5. Configure Users.xml.
+6. Configure Roles.xml.
+7. Grant App_Data write permissions.
+8. Verify login.
+9. Verify CRUD operations.
+10. Verify audit history.
+11. Verify XML logging.
+
+## 13.10 Password Security
+
+Passwords are stored and compared as plain text without encryption or hashing. The remaining password-related safeguards are:
+
+- Password change auditing
+- Password confirmation validation
+- Current password verification
+- Password history timestamp
+
+Hashing with salt was removed from the application (commit 61056dc) as a deliberate simplification; migrating to secure hashing remains a high-priority future improvement (see 14.1).
+
+## 13.11 Dynamic Code Security Considerations
+
+- Dynamic Code executes arbitrary compiled C# in the ERP process — a high-privilege capability gated by authentication and role only
+- There is no sandbox: a snippet has access to the ERP's process, configuration, and database connection
+- The Monaco editor is loaded from a CDN — the IDE depends on internet access; consider local bundling for air-gapped environments
+- Recommended controls: restrict Dynamic Code to the administrator role, add a publish/approval workflow for production overrides, and audit all override writes (already enforced via com_mst_audit_log)
+
+---
+
+# 14. Known Limitations & Technical Debt
+
+Although the Report Management System satisfies the current business requirements, several enhancements remain for future releases.
+
+## 14.1 Current Architectural Limitations
+
+| # | Limitation | Business Impact | Technical Details | Recommended Improvement |
+| --- | --- | --- | --- | --- |
+| 1 | XML-Based User Storage | Manual user management | Users maintained in Users.xml | Migrate to ASP.NET Identity or Active Directory |
+| 2 | No Password History Enforcement | Password reuse possible | Previous passwords are not retained | Prevent reuse of recently used passwords  |
+| 3 | No Password Expiration Policy | Long-lived credentials | Psswords do not expire automatically | Implement configurable password expiration policies  |
+| 4 | No RBAC Granularity | Limited permissions | Only SuperAdmin and Database Administrator roles | Add configurable role management |
+| 5 | Manual AlertConfigId Generation | Concurrency risk | Uses MAX(Id)+1 | Replace with identity column |
+| 6 | Hard Delete Strategy | Recovery limitation | Physical deletion | Implement soft delete |
+| 7 | Bootstrap 3 | Legacy UI | Older framework | Upgrade to Bootstrap 5 |
+| 8 | No Automated Unit Testing | Regression risk | Manual testing | Add unit & integration tests |
+| 9 | Fixed IST Timezone | Regional limitation | Hardcoded timezone | Configurable timezone support |
+| 10 | Client-Side Link Lookup | Performance limitation | Loads all records | Server-side autocomplete |
+| 11 | Legacy Sync Code | Maintainability | OLD_SYNC regions retained | Remove deprecated code |
+| 12 | No Anti-Forgery Tokens | Security risk | POST actions not protected | Apply ValidateAntiForgeryToken |
+| 13 | Synchronous Controllers | Scalability | ActionResult used | Convert to async controllers |
+| 14 | XML Log Growth | Storage usage | Daily XML logs continue growing | Implement log archival |
+| 15 | Session-Based Authentication | Single-server dependency | ASP.NET Session | Consider JWT/OpenID Connect |
+| 16 | SaveCode Persists Broken Code | Broken overrides activate in the ERP | DynamicCodeController.SaveCode ignores the compile result before saving | Check compiler result and block the save on compile failure |
+| 17 | CustomCodeDAL Is SQL Server-Only | Dynamic Code fails on MySQL/GEETEE | DAL bypasses DbProviderFactory and hardcodes SqlClient | Make CustomCodeDAL provider-agnostic (mirror Dal.GetFactory()) |
+| 18 | ERP Matches Without HTTP Verb | GET and POST overrides can collide | Matching uses controller + action only | Add an HttpMethod column to the CustomCode table |
+| 19 | Monaco Editor Loaded From CDN | External network dependency | Editor won't load without internet access | Bundle Monaco locally |
+| 20 | Dynamic Code Executes Arbitrary C# | Security/operational risk | No sandbox; capability is gated only by admin authentication | Add sandboxed execution and a publish/approval workflow |
+| 21 | Plain-Text Password Storage | Credential disclosure risk | Passwords stored unencrypted in Users.xml; no hashing or salt (removed in commit 61056dc) | Migrate to ASP.NET Identity with secure password hashing |
+
+## 14.2 Future Improvement Priorities
+
+### 14.2.1 High Priority
+
+- ASP.NET Identity
+- Password Hashing
+- Multi-Factor Authentication
+- Anti-Forgery Protection
+- Enforce the compile-result check in DynamicCodeController.SaveCode so broken code is never saved
+- Make CustomCodeDAL provider-agnostic so Dynamic Code works on MySQL
+
+### 14.2.2 Medium Priority
+
+- Bootstrap 5
+- Async Controllers
+- Server-side Search
+- Unit Testing
+- Add an HttpMethod column to CustomCode for verb-specific overrides
+- Bundle Monaco locally to remove the CDN dependency
+
+### 14.2.3 Low Priority
+
+- Log Archival
+- Timezone Configuration
+- REST API Authentication
+- Distributed Session Storage
+- Sandboxed execution for Dynamic Code snippets
+- Dynamic Code versioning and rollback
+
+---
+
+# 15. Conclusion
+
+The Report Management System provides a secure, centralized, and scalable administrative platform for managing reports, report metadata, alert configurations, scheduling information, company-level configurations, user administration, password management, and XML-based identity management across multiple SQL Server and MySQL environments.
+
+The application combines a layered ASP.NET MVC architecture, XML-based plain-text authentication, role-based authorization, centralized user administration, dynamic database connectivity, transaction management, comprehensive audit logging, and XML-based operational logging into a unified enterprise administration solution.
+
+Through provider-independent database access, centralized configuration management, reusable service-oriented components, standardized processing workflows, and secure identity management, the application delivers high maintainability, deployment flexibility, operational transparency, and enterprise-grade security.
+
+The Dynamic Code module extends this platform further: administrators author C# runtime overrides in an inbuilt Monaco IDE, and the ERP executes them against the shared CustomCode table without any ERP redeployment, creating a single administrative portal that controls both configuration data and runtime ERP behavior.
+
+The architecture has been designed to support future enhancements such as ASP.NET Identity, Multi-Factor Authentication (MFA), advanced role management, password history enforcement, password expiration policies, API integration, cloud deployment, and continued modernization while preserving compatibility with the current business environment.
+
+# Appendix A – Project File Structure
+
+## A.1 Configuration Files
+
+| File | Purpose |
+| --- | --- |
+| App_Data/Users.xml | User authentication data |
+| App_Data/Roles.xml | Role definitions |
+| App_Data/DbConnection.xml | Database connection catalog |
+| Web.config | Application configuration |
+| Web.config → DynamicCodeTable | CustomCode table name for Dynamic Code |
+| Web.config → DynamicCodePageSize | Dynamic Code grid page size |
+| Web.config → DefaultNamespaces | Base using set applied to Dynamic Code snippets |
+
+---
+
+## A.2 Controllers
+
+- HomeController
+- ReportController
+- ReportColumnController
+- ReportFilteringColumnController
+- AlertConfigController
+- AlertConfigAttachmentController
+- AlertScheduleController
+- CompanyConfigController
+- AuditTrailController
+- UserController
+- AccountController
+- DynamicCodeController
+- NameSpaceController
+- IntellisenseController
+
+---
+
+## A.3 Services
+
+- UserService
+- RoleService
+- ReportService
+- ReportColumnService
+- ReportFilteringColumnService
+- AlertConfigService
+- AlertConfigAttachmentService
+- AlertScheduleService
+- CompanyConfigService
+- AuditLogService
+- QueryLogger
+- ErrorLogger
+- ReportConfig
+- ServiceHelper
+- Dal
+- IDal
+- DynamicCodeService
+- CustomCodeDAL
+- Plain-text password validation
+- Password change
+- XML persistence
+
+---
+
+## A.4 Views
+
+- Home
+- Report
+- ReportColumn
+- ReportFilteringColumn
+- AlertConfig
+- AlertConfigAttachment
+- AlertSchedule
+- CompanyConfig
+- AuditTrail
+- DynamicCode (Index + IDE)
+- Shared Layout
+
+---
+
+## A.5 JavaScript
+
+- Home.js
+- ReportMaster.js
+- ReportColumn.js
+- ReportFilteringColumn.js
+- AlertConfig.js
+- AlertConfigAttachment.js
+- AlertSchedule.js
+- CompanyConfig.js
+- UserMaster.js
+- Account.js
+- DynamicCode.js
+
+---
+
+## A.6 Styles
+
+- Home.css
+- ReportMaster.css
+- ReportColumn.css
+- ReportFilteringColumn.css
+- AlertConfig.css
+- AlertConfigAttachment.css
+- AlertSchedule.css
+- CompanyConfig.css
+- UserMater.css
+- DynamicCode.css

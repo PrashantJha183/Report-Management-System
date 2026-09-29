@@ -1,0 +1,206 @@
+﻿@{
+    var textareaId = ViewBag.TextareaId as string ?? "txtNamespaces";
+    var suggestionId = "suggestions_" + textareaId;
+}
+
+<div class="editor-container">
+    <textarea id="@textareaId"
+              name="Namespaces"
+              placeholder="Type namespaces...
+System
+System.IO">@ViewBag.Value</textarea>
+
+    <div id="@suggestionId" class="suggestions-box"></div>
+</div>
+
+<style>
+    .editor-container {
+        position: relative;
+        width: 500px;
+    }
+
+        .editor-container textarea {
+            width: 100%;
+            height: 100px;
+            padding: 8px;
+            font-family: Consolas;
+        }
+
+    .suggestions-box {
+        position: absolute;
+        border: 1px solid #ccc;
+        background: white;
+        max-height: 200px;
+        overflow-y: auto;
+        display: none;
+        z-index: 1000;
+    }
+
+    .suggestion-item {
+        padding: 6px 10px;
+        cursor: pointer;
+    }
+
+        .suggestion-item:hover,
+        .selected {
+            background: #007acc;
+            color: white;
+        }
+</style>
+
+<script>
+(function () {
+
+    var textarea = document.getElementById("@textareaId");
+    var suggestionsBox = document.getElementById("@suggestionId");
+
+    if (!textarea) return;
+
+    var selectedIndex = -1;
+
+    textarea.addEventListener("input", triggerSuggest);
+    textarea.addEventListener("keydown", handleKeys);
+
+    function getCurrentLineInfo() {
+        var cursorPos = textarea.selectionStart;
+        var text = textarea.value;
+
+        var lines = text.substring(0, cursorPos).split("\n");
+        var currentLine = lines[lines.length - 1];
+
+        var lineStart = cursorPos - currentLine.length;
+
+        return {
+            line: currentLine.trim(),
+            start: lineStart,
+            cursor: cursorPos
+        };
+    }
+
+    function triggerSuggest() {
+        var info = getCurrentLineInfo();
+
+        if (!info.line) {
+            hideSuggestions();
+            return;
+        }
+
+        fetch('@Url.Action("Suggest", "NameSpace")?term=' + encodeURIComponent(info.line))
+            .then(res => res.json())
+            .then(data => renderSuggestions(data));
+    }
+
+    function renderSuggestions(data) {
+        suggestionsBox.innerHTML = "";
+        selectedIndex = -1;
+
+        if (!data || data.length === 0) {
+            hideSuggestions();
+            return;
+        }
+
+        data.forEach(function (item) {
+            var div = document.createElement("div");
+            div.className = "suggestion-item";
+            div.innerText = item;
+
+            div.onclick = function () {
+                applySuggestion(item);
+            };
+
+            suggestionsBox.appendChild(div);
+        });
+
+        positionDropdown();
+        suggestionsBox.style.display = "block";
+    }
+
+    function applySuggestion(text) {
+        var info = getCurrentLineInfo();
+
+        var before = textarea.value.substring(0, info.start);
+        var after = textarea.value.substring(info.cursor);
+
+        textarea.value = before + text + after;
+
+        textarea.focus();
+
+        var newCursor = info.start + text.length;
+        textarea.setSelectionRange(newCursor, newCursor);
+
+        hideSuggestions();
+    }
+
+    function handleKeys(e) {
+        var items = suggestionsBox.querySelectorAll(".suggestion-item");
+
+        if (items.length === 0) return;
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            selectedIndex = (selectedIndex + 1) % items.length;
+            highlight(items);
+        }
+        else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+            highlight(items);
+        }
+        else if (e.key === "Enter") {
+            if (selectedIndex >= 0) {
+                e.preventDefault();
+                applySuggestion(items[selectedIndex].innerText);
+            }
+        }
+        else if (e.key === ".") {
+            setTimeout(triggerSuggest, 100);
+        }
+    }
+
+    function highlight(items) {
+        items.forEach(function (i) { i.classList.remove("selected"); });
+        items[selectedIndex].classList.add("selected");
+    }
+
+    function hideSuggestions() {
+        suggestionsBox.style.display = "none";
+        suggestionsBox.innerHTML = "";
+        selectedIndex = -1;
+    }
+
+    function positionDropdown() {
+        const textareaRect = textarea.getBoundingClientRect();
+        const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight) || 18;
+
+        const textBeforeCursor = textarea.value.substring(0, textarea.selectionStart);
+        const lines = textBeforeCursor.split("\n");
+
+        const currentLineIndex = lines.length - 1;
+        const currentColumn = lines[lines.length - 1].length;
+
+        const charWidth = 7.5;
+
+        const top = textareaRect.top + (currentLineIndex * lineHeight) - textarea.scrollTop;
+        const left = textareaRect.left + (currentColumn * charWidth);
+
+        const containerRect = document.querySelector(".editor-container").getBoundingClientRect();
+
+        const verticalOffset = 8;
+
+        suggestionsBox.style.top =
+            (top - containerRect.top + lineHeight + verticalOffset) + "px";
+
+        suggestionsBox.style.left =
+            (left - containerRect.left) + "px";
+
+        suggestionsBox.style.width = "300px";
+    }
+
+    document.addEventListener("click", function (e) {
+        if (!e.target.closest(".editor-container")) {
+            hideSuggestions();
+        }
+    });
+
+})();
+</script>

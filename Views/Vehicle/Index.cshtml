@@ -1,0 +1,135 @@
+@model Report.Controllers.Vehicle
+
+@{
+    Layout = null;
+    string header = ViewBag.Header;
+}
+
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>@header</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background-color: #f4f6f9;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: auto;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: #2f6fed;
+            color: white;
+            padding: 18px 25px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .card-body {
+            padding: 25px;
+        }
+
+        .info-row {
+            display: flex;
+            border-bottom: 1px solid #e5e5e5;
+            padding: 12px 0;
+        }
+
+            .info-row:last-child {
+                border-bottom: none;
+            }
+
+        .label {
+            width: 180px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .value {
+            flex: 1;
+            color: #222;
+        }
+
+        .vehicle-icon {
+            text-align: center;
+            font-size: 60px;
+            margin-bottom: 15px;
+        }
+
+        @@media(max-width:600px) {
+            .info-row {
+                flex-direction: column;
+            }
+
+            .label {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+
+</head>
+<body>
+
+    <div class="container">
+
+        <div class="card">
+
+            <div class="card-header">
+                @header
+            </div>
+
+            <div class="card-body">
+
+                <div class="vehicle-icon">&#128663;</div>
+
+                <div class="info-row">
+                    <div class="label">Vehicle Number</div>
+                    <div class="value">@Model.VehicleNo</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Color</div>
+                    <div class="value">@Model.Color</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="label">Items</div>
+                    <div class="value">
+                        @if (Model.Items != null && Model.Items.Count > 0)
+                        {
+                            foreach (var item in Model.Items)
+                            {
+                                <span>@item &nbsp;</span>
+                            }
+                        }
+                        else
+                        {
+                            <text>-</text>
+                        }
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+</html>

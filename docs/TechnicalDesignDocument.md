@@ -27,6 +27,8 @@ A dedicated administration interface was required — one that provides safe, UI
 
 The Report Management System is an ASP.NET MVC 5 web application that provides inline-editable grids for managing report definitions, columns, filters, alert configurations, schedules, attachments, and company settings. The system supports both SQL Server and MySQL databases interchangeably, enforces column-level validation, prevents SQL injection through whitelisting, maintains a complete audit trail of all changes, and uses transactional batch saves to ensure data consistency.
 
+The system also hosts the **Dynamic Code module** — an administration IDE (Monaco editor with IntelliSense) for authoring C# code snippets that are persisted to the shared `CustomCode` table. At runtime the ERP application intercepts matching controller/action requests and executes these snippets, allowing endpoint behavior to be overridden from Report without redeploying the ERP application.
+
 ## 1.3 Business Benefits
 
 | Benefit | Description |
@@ -37,6 +39,7 @@ The Report Management System is an ASP.NET MVC 5 web application that provides i
 | **Controlled Administration** | Session-based authentication restricts access |
 | **Data Integrity** | Transactional saves prevent partial updates |
 | **Cross-Platform DB** | Single codebase supports both SQL Server and MySQL |
+| **Dynamic Extensibility** | ERP endpoint behavior can be overridden with C# code authored in Report — no ERP redeployment required |
 
 ---
 
@@ -86,6 +89,12 @@ A simple key-value store for company-specific settings. Manages configuration va
 
 **Key fields:** CompanyConfigId, CompanyId, Code, ConfigValue, Description
 
+## 2.8 Dynamic Code
+
+Manages runtime code overrides consumed by the ERP application. Each record maps a controller/action pair to a C# code body (optionally with extra `using` namespaces) plus a free-text description. Report is the authoring tool — it provides a CRUD grid and an IDE with compilation, IntelliSense, dot-completion, and signature help. Execution happens on the ERP side: `CallBackService` intercepts requests whose controller/action match a stored record, recompiles the snippet on every request, and returns the resulting `JsonResult`. Report stores the code only; the ERP holds no cached copy, so edits take effect immediately.
+
+**Key fields:** CustomCodeId, ControllerName, ActionName, Namespaces, CustomCode, Description
+
 # 3. High Level Architecture
 
 ## 3.1 Architecture Diagram
@@ -94,10 +103,10 @@ A simple key-value store for company-specific settings. Manages configuration va
 Browser (jQuery + Bootstrap 3)
        |
        v
-MVC Controllers (9 controllers)
+MVC Controllers (12 controllers)
        |
        v
-Service Layer (14 services)
+Service Layer (16 services)
        |
        v
 Data Access Layer (IDal / Dal)
@@ -106,32 +115,39 @@ Data Access Layer (IDal / Dal)
 SQL Server  /  MySQL
 ```
 
+> **Note:** 3 of the 12 controllers (`DynamicCodeController`, `NameSpaceController`, `IntellisenseController`) and 2 of the 16 services (`DynamicCodeService`, `CustomCodeDAL`) belong to the Dynamic Code module. The Dynamic Code consumer (the ERP application) is a separate application that reads the same `CustomCode` table at runtime.
+
 ## 3.2 Layer Responsibilities
 
 ### Presentation Layer (Views + JavaScript)
 - **Responsibilities:** Render HTML grids, handle user interactions, manage inline editing, validate input client-side, send AJAX requests
 - **Key files:** `Views/*/Index.cshtml`, `js/ReportMaster.js`, `js/ReportColumn.js`, etc.
-- **Dependencies:** jQuery 3.4.1, Bootstrap 3.4.1
+- **Dynamic Code files:** `Views/DynamicCode/Index.cshtml`, `Views/DynamicCode/IDE.cshtml`, `Views/Shared/_CodeEditor.cshtml` (Monaco), `Views/Shared/_NamespaceEditor.cshtml`, `js/DynamicCode.js`, `Styles/DynamicCode.css`
+- **Dependencies:** jQuery 3.4.1, Bootstrap 3.4.1, monaco-editor 0.45.0 (CDN)
 
 ### Controller Layer
 - **Responsibilities:** Handle HTTP requests, bind models, invoke services, return JSON or View results
 - **Key files:** `Controllers/ReportController.cs`, `Controllers/AlertConfigController.cs`, etc.
+- **Dynamic Code files:** `Controllers/DynamicCodeController.cs`, `Controllers/NameSpaceController.cs`, `Controllers/IntellisenseController.cs`
 - **Design decisions:** No dependency injection container — services are instantiated directly in constructors. All controller action methods are synchronous despite services being async (simplified migration).
 
 ### Service Layer
 - **Responsibilities:** Business logic, column whitelist validation, change grouping, SQL generation, audit logging, transaction management
 - **Key files:** `Services/ReportService.cs`, `Services/AuditLogService.cs`, `Services/ServiceHelper.cs`
+- **Dynamic Code files:** `Services/DynamicCodeService.cs`, `Services/CustomCodeDAL.cs`
 - **Design decisions:** Services accept `IDal` interface for testability, with a fallback to `new Dal()`. Static utility classes (`ServiceHelper`, `ErrorLogger`, `QueryLogger`) handle cross-cutting concerns.
 
 ### Data Access Layer
 - **Responsibilities:** Abstract database operations, manage connections and transactions, handle provider-specific SQL differences
 - **Key files:** `Services/IDal.cs`, `Services/Dal.cs`
 - **Design decisions:** Uses `DbProviderFactory` for database-agnostic access. Connection configuration is read once at static initialization from `DbConnection.xml`. Transaction support is instance-level with BeginTransaction/Commit/Rollback.
+- **Known exception:** `CustomCodeDAL.cs` (Dynamic Code) bypasses the `DbProviderFactory` abstraction and hardcodes `System.Data.SqlClient` — see §14.4.
 
 ### Configuration Layer
 - **Responsibilities:** Centralized configuration for table names, page sizes, timezone, DB connection path
 - **Key files:** `Services/ReportConfig.cs`, `App_Data/DbConnection.xml`, `Web.config`
 - **Design decisions:** All table names and page sizes are configurable via `Web.config` appSettings, allowing the same deployment to point to different database schemas.
+- **Dynamic Code settings:** `DynamicCodeTable` (`CustomCode`), `DynamicCodePageSize` (`7`), `DefaultNamespaces` (base `using` set prepended to every snippet).
 
 ---
 
@@ -164,6 +180,9 @@ Report/
 |   |-- AlertConfigAttachmentController.cs
 |   |-- CompanyConfigController.cs    # Company Config CRUD
 |   |-- AuditTrailController.cs       # Audit log viewer + deleted records
+|   |-- DynamicCodeController.cs      # Dynamic Code grid + IDE (save/delete/id mapping)
+|   |-- NameSpaceController.cs        # Namespace autocomplete (reflection)
+|   |-- IntellisenseController.cs     # Monaco dot-completion + signature help
 |
 |-- Models/
 |   |-- comMstReport.cs               # ComMstReport, ReportGridViewModel, ReportChange, etc.
@@ -174,6 +193,7 @@ Report/
 |   |-- ComMstAlertConfigAttachment.cs
 |   |-- ComMstCompanyConfig.cs
 |   |-- AuditLog.cs                   # AuditLog entity + AuditLogGridViewModel
+|   |-- DynamicCodeModels.cs          # GridItem, Change, Request/Result, GridViewModel, IDEViewModel
 |
 |-- Services/
 |   |-- IDal.cs                       # Data access interface (async)
@@ -190,6 +210,8 @@ Report/
 |   |-- AuditLogService.cs            # Audit log read/write operations
 |   |-- ErrorLogger.cs                # Thread-safe XML error logging
 |   |-- QueryLogger.cs                # Thread-safe XML query logging
+|   |-- DynamicCodeService.cs         # Dynamic Code CRUD + IDE save + audit logging
+|   |-- CustomCodeDAL.cs              # CustomCode table CRUD (SqlClient-only)
 |
 |-- Scripts/
 |   |-- jquery-3.4.1.js               # jQuery
@@ -205,6 +227,19 @@ Report/
 |   |-- AlertSchedule.css             # Alert Schedule grid (565 lines)
 |   |-- AlertConfigAttachment.css     # Alert Attachment grid (565 lines)
 |   |-- CompanyConfig.css             # Company Config grid (562 lines)
+|   |-- DynamicCode.css               # Dynamic Code grid + IDE panel (843 lines)
+|
+|-- js/
+|   |-- ReportMaster.js               # Report Master grid client logic
+|   |-- ReportColumn.js               # Report Column grid client logic
+|   |-- ReportFilteringColumn.js      # Filtering Column grid client logic
+|   |-- AlertConfig.js                # Alert Config grid client logic
+|   |-- AlertSchedule.js              # Alert Schedule grid client logic
+|   |-- AlertConfigAttachment.js      # Alert Attachment grid client logic
+|   |-- CompanyConfig.js              # Company Config grid client logic
+|   |-- UserMaster.js                 # User Master grid client logic
+|   |-- shared-grid.js                # Shared grid helpers
+|   |-- DynamicCode.js                # Dynamic Code grid + IDE panel client logic
 |
 |-- Views/
 |   |-- _ViewStart.cshtml
@@ -217,6 +252,10 @@ Report/
 |   |-- AlertConfigAttachment/Index.cshtml
 |   |-- CompanyConfig/Index.cshtml
 |   |-- AuditTrail/AuditLogs.cshtml   # Audit history + deleted records viewer
+|   |-- DynamicCode/Index.cshtml      # Dynamic Code grid + inline Monaco IDE panel
+|   |-- DynamicCode/IDE.cshtml        # Standalone IDE page (Layout = null)
+|   |-- Shared/_CodeEditor.cshtml     # Monaco editor partial (IntelliSense providers)
+|   |-- Shared/_NamespaceEditor.cshtml# Namespace textarea + autocomplete suggestions
 |   |-- Shared/_Layout.cshtml         # Master layout (navbar, logout, scripts)
 |
 |-- Global.asax.cs                    # Application_Start (filters, routes, bundles)
@@ -229,12 +268,13 @@ Report/
 | Folder | Purpose | Responsibility | Key Files | Dependencies |
 |--------|---------|---------------|-----------|--------------|
 | `App_Start/` | ASP.NET bootstrap | Register routes, filters, bundles | `FilterConfig.cs`, `RouteConfig.cs`, `BundleConfig.cs` | MVC, Web.Optimization |
-| `Controllers/` | HTTP request handling | Receive requests, return responses | All 9 controllers | Services, Models |
-| `Models/` | Data transfer objects | Entity definitions, ViewModels, DTOs | 8 model files | None |
-| `Services/` | Business logic + data access | CRUD, validation, audit, logging | 14 service files | System.Data, Newtonsoft |
-| `Views/` | UI templates | Razor rendering | 12+ view files | Models, Layout |
+| `Controllers/` | HTTP request handling | Receive requests, return responses | All 12 controllers | Services, Models |
+| `Models/` | Data transfer objects | Entity definitions, ViewModels, DTOs | 9 model files | None |
+| `Services/` | Business logic + data access | CRUD, validation, audit, logging | 16 service files | System.Data, Newtonsoft |
+| `Views/` | UI templates | Razor rendering | 15+ view files | Models, Layout |
 | `Scripts/` | Client-side libraries | jQuery, Bootstrap, validation | 5+ library files | None |
-| `Styles/` | Page-specific CSS | Grid styling, design system | 7 CSS files | Bootstrap |
+| `js/` | Per-module client logic | Grid editing, IDE panel, toolbars | 8 custom JS files | jQuery, Monaco |
+| `Styles/` | Page-specific CSS | Grid styling, design system | 8 CSS files | Bootstrap |
 | `App_Data/` | Configuration + logs | XML config, error/query logs | `DbConnection.xml` | File system |
 
 # 5. Database Architecture
@@ -253,6 +293,8 @@ com_mst_report (1) ---< (many) com_mst_reportcolumn
                 +---< (many) com_mst_alertconfigattachment
 
 com_mst_link_item (1) ---< (many) com_mst_report
+
+CustomCode (standalone)   # No FK relationships; written by Report, read by the ERP at runtime
 ```
 
 ## 5.2 Relationship Details
@@ -374,6 +416,23 @@ Stores report definitions — the SQL query, WHERE clause, sorting, master-detai
 | CreatedOn | datetime | Timestamp (IST) |
 | CreatedBy | int | Who made the change |
 
+## 5.10 Table: CustomCode
+
+Stores runtime code overrides. Written by the Report Dynamic Code module and read/executed by the ERP application at runtime. The table lives in the database of each environment (SQL Server for most environments, MySQL for GEETEE).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| CustomCodeId | int (PK) | Auto-increment identity |
+| ControllerName | nvarchar | Controller to intercept (e.g., `VehicleCallBack`) |
+| ActionName | nvarchar | Action to intercept (e.g., `GetVehicleModelOnManufacturer`) |
+| Namespaces | nvarchar | Comma-separated `using` namespaces for compilation |
+| CustomCode | nvarchar(max) | C# code body — must return a `JsonResult` |
+| Description | nvarchar | Human-readable purpose of the override |
+
+Notes:
+- **No `HttpMethod` column** — the ERP matches by controller + action name only (see §6.3).
+- The persisted `Namespaces` value deliberately excludes `System.Collections.Generic` (RSuite's compiler header already includes it) and any `Report.*` namespaces (Report's own app assemblies cannot be resolved by the ERP runtime process).
+
 ---
 
 # 6. Request Lifecycle
@@ -419,6 +478,45 @@ User sees updated row
 10. **Audit Logging:** Captured JSON snapshot written to audit log
 11. **Response:** Result object with status and ID mappings returned to client
 12. **UI Update:** JavaScript updates data-* attributes, replaces temp IDs, hides edit form, shows success
+
+## 6.3 Dynamic Code Request Lifecycle
+
+### 6.3.1 Report-side (authoring)
+
+```
+Grid flow:
+User edits grid cell (Controller/Action/Description)
+  -> Save -> POST DynamicCode/SaveChanges { mode, changes[] }
+    -> DynamicCodeService.SaveChangesAsync
+      -> NEW row (temp ID < 0): INSERT via CustomCodeDAL.AddAsync -> return real ID
+      -> EXISTING row: capture before-image JSON -> UPDATE -> write audit (UPDATE)
+  -> IdMappings returned -> temp IDs replaced client-side
+
+IDE flow:
+User opens IDE -> fills Controller/Action/Description/Namespaces/Code
+  -> POST DynamicCode/SaveCode (IDEViewModel)
+    -> Build namespace string (strip System.Collections.Generic + Report.*)
+    -> AssemblyManager.RemoveAsseblyModel
+    -> RSuite DynamicCodeExecutor.CompileCode (gacList: System.Web.dll, Microsoft.CSharp.dll)
+    -> DynamicCodeService.SaveCodeFromIDEAsync -> INSERT/UPDATE + audit (UPDATE)
+```
+
+### 6.3.2 ERP-side (runtime interception)
+
+```
+HTTP Request to an ERP controller/action
+  -> Global.asax.cs Application_BeginRequest
+    -> CallBackService.IsDynamicActionPresent(url)
+      -> GetByControllerAction(controller, action)   # controller + action only, no HTTP verb
+      -> if match: rewrite URL to DynamicCallBack/Execute
+    -> CallBackService.Execute
+      -> read Namespaces + CustomCode from CustomCode table
+      -> CompilerService.Compile(code, namespaces)   # recompiled EVERY request, no cache
+      -> Activator.CreateInstance -> MethodInfo.Invoke
+      -> HttpContext.Current.Response.Write(JsonResult) / return result
+```
+
+Because every request is recompiled, an override saved in Report is active on the very next ERP request. Generated wrapper classes are **not** `Controller` instances, so snippet bodies must construct `JsonResult` explicitly (`new JsonResult { Data = ..., JsonRequestBehavior = JsonRequestBehavior.AllowGet }`) rather than calling the controller helper `Json(...)`.
 
 ---
 
@@ -612,6 +710,8 @@ The AuditTrailController provides two views:
 
 2. **DeletedRecords** — Lists all DELETE operations for a given table. For com_mst_report deletions, resolves ReferenceLinkId to link item names for readability.
 
+3. **Dynamic Code integration** — The Dynamic Code grid uses the same audit pattern: UPDATE and DELETE actions capture the before-image of the `CustomCode` row as JSON via `GetRowAsJsonAsync()` and write it to `com_mst_audit_log` (TableName = `CustomCode`, RecordId = `CustomCodeId`). The grid exposes an inline **Deleted Records** button that opens `AuditTrail/AuditLogs.cshtml` with `AuditTableName=CustomCode` and `RecordIdLabel=Code ID`. Audit failures on delete are swallowed in a try/catch so a completed delete is never rolled back.
+
 ---
 
 # 9. Authentication Architecture
@@ -777,6 +877,16 @@ public class LoginAuthorizeAttribute : AuthorizeAttribute
 | Files Modified | Services/ReportConfig.cs (new), all service files updated |
 | Outcome | Centralized configuration, deployable to different environments without recompilation |
 
+## 10.11 Dynamic Code Module
+
+| Aspect | Detail |
+|--------|--------|
+| Problem | No way to override or extend ERP action code without redeploying the ERP application |
+| Solution | Report provides a CRUD grid plus an inline Monaco IDE where admins author C# snippets. Snippets are stored in the shared `CustomCode` table (controller/action/namespaces/code/description). The ERP's `CallBackService` intercepts matching controller/action requests at runtime and executes the stored code |
+| Implementation | Grid + IDE panel on `DynamicCode/Index.cshtml`; Monaco 0.45.0 (CDN) with keyword/dot-completion and signature help via `IntellisenseController`; namespace autocomplete via `NameSpaceController`; compilation uses the RSuite `DynamicCodeExecutor`; per-request recompilation on the ERP side means edits apply immediately |
+| Files Modified | Controllers: `DynamicCodeController.cs`, `NameSpaceController.cs`, `IntellisenseController.cs`; Services: `DynamicCodeService.cs`, `CustomCodeDAL.cs`; Models: `DynamicCodeModels.cs`; Views: `DynamicCode/Index.cshtml`, `DynamicCode/IDE.cshtml`, `Shared/_CodeEditor.cshtml`, `Shared/_NamespaceEditor.cshtml`; JS: `js/DynamicCode.js`; CSS: `Styles/DynamicCode.css`; Config: `Web.config` appSettings (`DynamicCodeTable`, `DynamicCodePageSize`, `DefaultNamespaces`), `ReportConfig.cs` |
+| Outcome | Admins write and store C# code with IntelliSense from Report — the ERP executes it at runtime without redeployment |
+
 ---
 
 # 11. Problems Faced & Solutions
@@ -862,6 +972,34 @@ public class LoginAuthorizeAttribute : AuthorizeAttribute
 | Root Cause | Different SQL dialects |
 | Solution | Abstracted behind IDal.GetPaginationClause(offset, pageSize) with provider-specific implementations |
 | Files Modified | Services/Dal.cs, Services/IDal.cs |
+
+## 11.10 "The name 'Json' does not exist in the current context" in Dynamic Code
+
+| Aspect | Detail |
+|--------|--------|
+| Problem | Snippets using `return Json(...)` fail compilation at runtime |
+| Root Cause | The generated dynamic wrapper class is not a `Controller`, so the MVC `Json()` helper method does not exist in its scope |
+| Solution | Snippets must construct `JsonResult` explicitly: `return new JsonResult { Data = ..., JsonRequestBehavior = JsonRequestBehavior.AllowGet };` |
+| Files Modified | Depends on the snippet — no application code change; documented in `_CodeEditor.cshtml` guidance and §21 |
+
+## 11.11 Broken Code Saved Despite Compile Failure
+
+| Aspect | Detail |
+|--------|--------|
+| Problem | A snippet that fails to compile is still persisted; the ERP then throws on every matching request |
+| Root Cause | `DynamicCodeController.SaveCode` runs `executor.CompileCode(...)` but never inspects the returned compile result (`rm.Errors` / `rm.Success`) before calling `SaveCodeFromIDEAsync` (DynamicCodeController.cs:180-198) |
+| Solution | Check the compile result and return the compiler errors without saving when compilation fails |
+| Files Modified | `Controllers/DynamicCodeController.cs` (pending fix) |
+| Current Status | Open — verified when a `return Json(...)` body was saved successfully despite a failed compile |
+
+## 11.12 CustomCodeDAL Hardcoded to SqlClient
+
+| Aspect | Detail |
+|--------|--------|
+| Problem | Dynamic Code grid/login fails with a MySQL provider error on GEETEE |
+| Root Cause | `Services/CustomCodeDAL.cs` instantiates `System.Data.SqlClient` types directly instead of using `Dal.GetFactory()`, so it works on SQL Server environments but not MySQL (GEETEE) |
+| Solution | Mirror the `GetFactory()` provider switch (`MYSQL` -> `MySqlClientFactory.Instance`, `SQLSERVER` -> `SqlClientFactory.Instance`) in `CustomCodeDAL` |
+| Files Modified | `Services/CustomCodeDAL.cs` (pending fix) |
 
 ---
 
@@ -1007,6 +1145,15 @@ private DbProviderFactory GetFactory()
 | Null coalesce | ISNULL(x, 0) | IFNULL(x, 0) | GetNullFunction() |
 | Table lock | WITH (TABLOCKX, HOLDLOCK) | FOR UPDATE | GetTableLockHint() |
 
+## 14.4 Dynamic Code Cross-Database Limitation
+
+The main data access path (`IDal`/`Dal`) is provider-agnostic through `DbProviderFactory`, but **`CustomCodeDAL.cs` is the exception**: it hardcodes `System.Data.SqlClient` (`SqlConnection`, `SqlCommand`, `SqlParameter`) and does not consult `Session["DbType"]` or `Dal.GetFactory()`. Consequences:
+
+- Works on SQL Server environments (e.g., `RLogic9-Dev`).
+- Fails on MySQL environments (GEETEE `rlogic9geeteeuat`) with a provider/type error as soon as the Dynamic Code screen queries `CustomCode`.
+
+The intended fix mirrors the §14.1 `GetFactory()` switch inside `CustomCodeDAL`, resolving the provider from `Session["DbType"]` (set in `HomeController.Login`, lines 68-69).
+
 ---
 
 # 15. Configuration Management
@@ -1036,6 +1183,9 @@ private DbProviderFactory GetFactory()
 | AuditLogTable | com_mst_audit_log | Audit log table |
 | ReportPageSize | 5 | Pagination size for reports |
 | MaxPageSize | 100 | Upper bound for any page size |
+| DynamicCodeTable | CustomCode | Backing table for Dynamic Code entries |
+| DynamicCodePageSize | 7 | Grid page size for Dynamic Code |
+| DefaultNamespaces | Report.Controllers, Report.Services, System.Web.Mvc, System.Collections.Generic, System.Linq | Base `using` set applied to every compiled snippet |
 
 ## 15.3 Table Name Configuration Pattern
 
@@ -1071,9 +1221,10 @@ This allows the same deployment to work with different table schemas by simply c
 
 ## 16.3 Database Setup
 
-1. Ensure all required tables exist: com_mst_report, com_mst_reportcolumn, com_mst_reportfilteringcolumn, com_mst_alertconfig, com_mst_alertschedule, com_mst_alertconfigattachment, com_mst_companyconfig, com_mst_audit_log, com_mst_link_item
+1. Ensure all required tables exist: com_mst_report, com_mst_reportcolumn, com_mst_reportfilteringcolumn, com_mst_alertconfig, com_mst_alertschedule, com_mst_alertconfigattachment, com_mst_companyconfig, com_mst_audit_log, com_mst_link_item, CustomCode
 2. Configure App_Data/DbConnection.xml with correct connection string and DbType
 3. Verify network connectivity between IIS and database server
+4. For Dynamic Code on MySQL (GEETEE), note that `CustomCodeDAL` is currently SQL Server-only (see §14.4)
 
 ## 16.4 Deployment Checklist
 
@@ -1089,6 +1240,8 @@ This allows the same deployment to work with different table schemas by simply c
 - [ ] Perform test edit and save
 - [ ] Verify audit log entry created
 - [ ] Verify error/query log files created in App_Data
+- [ ] Verify Dynamic Code grid loads and edits persist to the CustomCode table
+- [ ] Write a test override in Report and confirm the ERP picks it up on the next request (recompiled per request — no ERP redeploy needed)
 
 ## 16.5 Rollback Strategy
 
@@ -1113,6 +1266,11 @@ This allows the same deployment to work with different table schemas by simply c
 | 9 | Old sync code preserved | Code clutter | OLD_SYNC regions take ~30% of service files |
 | 10 | No anti-forgery tokens | CSRF vulnerability | POST endpoints lack ValidateAntiForgeryToken |
 | 11 | Controller actions are synchronous | Thread pool inefficiency | Actions return ActionResult instead of async Task<ActionResult> |
+| 12 | SaveCode persists compile-failed code | Broken overrides activate in the ERP | DynamicCodeController.SaveCode ignores the compile result before saving (see §11.11) |
+| 13 | CustomCodeDAL is SQL Server-only | Dynamic Code fails on MySQL/GEETEE | DAL bypasses DbProviderFactory and hardcodes SqlClient (see §14.4) |
+| 14 | The ERP matches without HTTP verb | GET and POST overrides can collide | Matching uses controller + action only; no HttpMethod column in CustomCode |
+| 15 | Monaco editor loaded from CDN | External network dependency | Editor won't load without internet access; consider local bundling |
+| 16 | Dynamic Code executes arbitrary C# | Security/operational risk | No sandbox; capability is gated only by admin authentication |
 
 ---
 
@@ -1126,6 +1284,9 @@ This allows the same deployment to work with different table schemas by simply c
 - Clean up OLD_SYNC code blocks
 - Migrate controller actions to async (async Task<ActionResult>)
 - Add soft delete with IsDeleted flag
+- Enforce the compile-result check in DynamicCodeController.SaveCode so broken code is never saved
+- Make CustomCodeDAL provider-agnostic (mirror Dal.GetFactory()) so Dynamic Code works on MySQL
+- Add an HttpMethod column to the CustomCode table so an override can target a specific HTTP verb
 
 ## 18.2 Medium Term (6-12 Months)
 
@@ -1134,6 +1295,8 @@ This allows the same deployment to work with different table schemas by simply c
 - Implement distributed caching (Redis) for frequently accessed data
 - Convert AlertConfigId to auto-increment
 - Add pagination and search for link items dropdown
+- Runtime assembly caching with invalidation on save instead of per-request recompilation of Dynamic Code snippets
+- Dynamic Code versioning and rollback (history table or snapshot field in CustomCode)
 
 ## 18.3 Long Term (12-24 Months)
 
@@ -1144,6 +1307,8 @@ This allows the same deployment to work with different table schemas by simply c
 - Upgrade Bootstrap 3 to Bootstrap 5
 - Audit dashboard with search, filtering, visualization
 - Automated CI/CD pipeline deployment
+- Sandboxed execution for Dynamic Code snippets (AppDomain isolation or Roslyn scripting sandbox)
+- Role-gated publish approval workflow for Dynamic Code overrides before they reach production
 
 ---
 
@@ -1164,6 +1329,14 @@ This allows the same deployment to work with different table schemas by simply c
 | js/ReportMaster.js | Client-side grid editing - edit, save, delete, audit, add row |
 | Styles/ReportMaster.css | Styling pattern - modern design system used by all pages |
 | Controllers/ReportController.cs | Controller pattern - Index (GET), SaveChanges (POST), Delete (POST) |
+| Controllers/DynamicCodeController.cs | Dynamic Code controller — grid, IDE compile+save, GetCode JSON for inline IDE |
+| Services/DynamicCodeService.cs | Dynamic Code service — GetAll/SaveChanges/Delete with audit logging, SaveCodeFromIDEAsync |
+| Services/CustomCodeDAL.cs | CustomCode table CRUD — note: hardcodes SqlClient (see §14.4) |
+| Models/DynamicCodeModels.cs | Dynamic Code DTOs — GridItem, Change, GridViewModel, IDEViewModel |
+| Views/DynamicCode/Index.cshtml | Dynamic Code grid + inline IDE panel + Deleted Records button |
+| Views/Shared/_CodeEditor.cshtml | Monaco editor partial — keyword/dot-completion, signature help providers |
+| js/DynamicCode.js | Dynamic Code client logic — showIDE/populateIDE/loadClassesForNamespaces |
+| ERP-side: CallBackService.cs | ERP-side runtime interception — isDynamicActionPresent, per-request recompile |
 
 ## 19.2 How to Add a New Module
 
@@ -1176,6 +1349,8 @@ This allows the same deployment to work with different table schemas by simply c
 7. **CSS:** Create stylesheet following existing design system
 8. **Navigation:** Add link in _Layout.cshtml
 9. **Edit form:** Add edit row in the view with fields matching the whitelist
+
+> **Dynamic Code special case:** Dynamic Code does not follow the standard grid-save pattern for the Code/Namespaces fields — those are edited exclusively through the IDE panel (`_CodeEditor.cshtml`) via the `DynamicCode/SaveCode` action, which performs a CodeDOM compilation before saving. The grid `SaveChanges` action handles only the metadata columns (ControllerName, ActionName, Description).
 
 ## 19.3 How Audit Works
 
@@ -1213,6 +1388,11 @@ This allows the same deployment to work with different table schemas by simply c
 | "ERROR: ..." on Save | Check ErrorLogs/ directory for stack trace | Can be SQL syntax, constraint violation, or connection issue |
 | Pagination showing wrong total | Check COUNT(*) OVER() in SQL | Verify no GROUP BY affecting window function |
 | Query logs empty | Check QueryLogger.Log() filters INSERT/UPDATE/DELETE only | SELECT queries intentionally not logged |
+| Dynamic Code "Json does not exist" at runtime | Snippet uses `Json(...)` instead of `new JsonResult { ... }` | Generated wrapper is not a Controller; must construct JsonResult explicitly (see §21.5) |
+| Dynamic Code saved but the ERP still returns original response | Controller or action name does not match the actual ERP endpoint | Double-check exact controller+action (no HTTP verb considered); check the ERP route mapping |
+| Dynamic Code screen fails on GEETEE login | `CustomCodeDAL` uses SqlClient against a MySQL database | Known limitation (see §14.4); pending fix |
+| Dynamic Code override not visible on the ERP edit form | Many ERP forms reset the dropdown value after `$.getJSON` populates options | Verify the override is live by inspecting the network request to the overridden endpoint directly, or use a New form rather than an edit form |
+| IntelliSense shows no types | `NameSpaceController.Suggest` returns empty assembly list | Ensure the namespaces string is populated and the referenced assemblies are loadable in the Report process (check `AppDomain.GetAssemblies()` availability) |
 
 ---
 
@@ -1220,19 +1400,316 @@ This allows the same deployment to work with different table schemas by simply c
 
 | Category | Count | Details |
 |----------|-------|---------|
-| Business Entities | 9 | Report, ReportColumn, ReportFilteringColumn, AlertConfig, AlertSchedule, AlertConfigAttachment, CompanyConfig, AuditLog, LinkItem |
-| Controllers | 9 | Report, ReportColumn, ReportFilteringColumn, AlertConfig, AlertSchedule, AlertConfigAttachment, CompanyConfig, Home, AuditTrail |
-| Services | 14 | IDal, Dal, ReportConfig, ServiceHelper, ErrorLogger, QueryLogger, AuditLogService + 7 business services |
-| Views | 12 | 7 entity Index views, 2 Home views, 1 AuditLogs, 1 Shared layout, 1 Error |
-| JavaScript Files | 7 | One per business entity |
-| CSS Files | 7 custom + 2 Bootstrap | One per entity + Bootstrap framework |
-| Model Files | 8 | One per entity + AuditLog |
-| Database Tables | 9 | 7 business + 1 audit log + 1 link item reference |
+| Business Entities | 10 | Report, ReportColumn, ReportFilteringColumn, AlertConfig, AlertSchedule, AlertConfigAttachment, CompanyConfig, AuditLog, LinkItem, CustomCode |
+| Controllers | 12 | Report, ReportColumn, ReportFilteringColumn, AlertConfig, AlertSchedule, AlertConfigAttachment, CompanyConfig, Home, AuditTrail, DynamicCode, NameSpace, Intellisense |
+| Services | 16 | IDal, Dal, ReportConfig, ServiceHelper, ErrorLogger, QueryLogger, AuditLogService, DynamicCodeService, CustomCodeDAL + 7 business services |
+| Views | 15 | 7 entity Index views, DynamicCode/Index + IDE, 2 Home views, 1 AuditLogs, Shared/_Layout, Shared/_CodeEditor, Shared/_NamespaceEditor, 1 Error |
+| JavaScript Files | 8 | One per business entity + DynamicCode.js (Grid + IDE panel) |
+| CSS Files | 8 custom + 2 Bootstrap | One per entity + DynamicCode.css (grid + IDE panel) + Bootstrap framework |
+| Model Files | 9 | One per entity + AuditLog + DynamicCodeModels |
+| Database Tables | 10 | 7 business + 1 audit log + 1 link item reference + 1 CustomCode |
 | Audit Layers | 2 | Application-level (full row JSON) + Database-level (transactional) |
-| Total Enhancements | 10 | Cross-DB, whitelist, audit, temp ID, pagination optimization, async migration, consolidated UPDATE, autocomplete, dependency checks, centralized config |
-| Problems Solved | 10 | Double-click rows, save click, SQL injection, identity race, page sizes, JSON formatting, orphan deletes, sync cleanup, cross-DB pagination, autocomplete positioning |
+| Enhancements | 11 | Cross-DB, whitelist, audit, temp ID, pagination optimization, async migration, consolidated UPDATE, autocomplete, dependency checks, centralized config, Dynamic Code module |
+| Problems Solved | 13 | Double-click rows, save click, SQL injection, identity race, page sizes, JSON formatting, orphan deletes, sync cleanup, cross-DB pagination, autocomplete positioning, Json-in-dynamic-scope, broken-code-save, SqlClient-hardcode |
 | NuGet Packages | 33 | MVC 5.2.7, jQuery 3.4.1, Bootstrap 3.4.1, MySql.Data 8.0.33, Newtonsoft.Json 12.0.2 |
-| Lines of Code (approx.) | ~12,000 | C# ~5,500, JavaScript ~2,880, CSS ~4,000, Razor ~1,000 |
+| Lines of Code (approx.) | ~13,000 | C# ~5,800, JavaScript ~3,100, CSS ~4,800, Razor ~1,000+ |
+
+---
+
+# 21. Dynamic Code Module — Detailed Architecture
+
+## 21.1 Purpose
+
+The Dynamic Code module allows administrators to write, compile, and store C# code snippets directly from the Report UI. These snippets are then intercepted and executed at runtime by the **ERP** application, enabling endpoint behavior (such as changing dropdown values on a master form) to be overridden without modifying or redeploying the ERP application.
+
+Report is the authoring tool. The ERP is the execution environment. The two applications share the same database and communicate exclusively through the `CustomCode` table.
+
+## 21.2 Database Schema — `CustomCode`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| CustomCodeId | int (PK) | Auto-increment identity; displayed as "Code ID" in the grid |
+| ControllerName | nvarchar | MVC controller name to intercept (e.g., `VehicleCallBack`) |
+| ActionName | nvarchar | MVC action name to intercept (e.g., `GetVehicleModelOnManufacturer`) |
+| Namespaces | nvarchar | Comma-separated `using` statements (e.g., `System.Web.Mvc, System.Linq`) |
+| CustomCode | nvarchar(max) | C# code body |
+| Description | nvarchar | Human-readable purpose of the override |
+
+- **No `HttpMethod` column** — the ERP matches by controller + action only (`CallBackService.GetByControllerAction`).
+- `System.Collections.Generic` is stripped from the stored `Namespaces` value (the RSuite compiler header already includes it).
+- `Report.*` namespaces are stripped (Report's own assemblies cannot be resolved by the ERP runtime process).
+
+## 21.3 Architecture Overview
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Report (admin authoring)                                                    │
+│                                                                              │
+│  ┌──────────────────┐  ┌────────────────────┐  ┌──────────────────────────┐  │
+│  │ DynamicCode      │  │ NameSpace          │  │ Intellisense             │  │
+│  │ Controller       │  │ Controller         │  │ Controller               │  │
+│  │  Index (GET)     │  │  Suggest (GET)     │  │  Completions (POST)      │  │
+│  │  SaveChanges     │  │  NamespaceEditor   │  │  Signatures (POST)       │  │
+│  │  SaveCode        │  │   partial (GET)    │  │  CodeEditor partial      │  │
+│  │  GetCode (JSON)  │  └────────────────────┘  └──────────────────────────┘  │
+│  │  Delete (POST)   │                                                        │
+│  └────────┬─────────┘                                                        │
+│           │                                                                  │
+│  ┌────────▼──────────────────────────────────────────────────┐               │
+│  │ DynamicCodeService                                        │               │
+│  │  GetAllAsync → in-memory sort + pagination                │               │
+│  │  SaveChangesAsync → grouped INSERT/UPDATE + audit         │               │
+│  │  SaveCodeFromIDEAsync → compile-guarded save (pending)    │               │
+│  │  DeleteAsync → audit then delete                          │               │
+│  └────────┬──────────────────────────────────────────────────┘               │
+│           │                                                                  │
+│  ┌────────▼─────────────────────┐   ┌──────────────────────┐                │
+│  │ AuditLogService              │   │ RSuite DynamicCode   │                │
+│  │  LogChangeAsync (before/after)│  │ Executor             │                │
+│  └──────────────────────────────┘   │  CompileCode(...)    │                │
+│                                     └──────────┬───────────┘                │
+│           │                                    │ compilation                 │
+│  ┌────────▼─────────────────────┐              │                            │
+│  │ CustomCodeDAL                │◄─────────────┘                            │
+│  │  CRUD (hardcoded SqlClient)  │                                           │
+│  └────────┬─────────────────────┘                                           │
+│           │                                                                  │
+│      ┌────▼────┐                                                            │
+│      │ DB Table │  CustomCode (shared with the ERP)                           │
+│      └─────────┘                                                            │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ERP (runtime execution)                                                  │
+│                                                                              │
+│  HTTP Request                                                                │
+│    → Global.asax.cs  Application_BeginRequest                                │
+│      → CallBackService.IsDynamicActionPresent(request.Url)                   │
+│        → GetByControllerAction(controller, effectiveAction)                  │
+│           (controller + action only; no HTTP verb check)                     │
+│      → rewrite path to DynamicCallBack/Execute                               │
+│                                                                              │
+│  CallBackService.Execute()                                                   │
+│    → CustomCodeDAL.GetCode(controller, action)                               │
+│    → CompilerService.Compile(code, namespaces)                               │
+│    → Activator.CreateInstance → MethodInfo.Invoke                             │
+│    → HttpContext.Current.Response.Write(result) / return result              │
+│                                                                              │
+│  Recompiles per request (no cache) → edits in Report apply immediately      │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+## 21.4 Report-Side Components
+
+### 21.4.1 DynamicCodeController (`Controllers/DynamicCodeController.cs`)
+
+| Action | HTTP | Purpose |
+|--------|------|---------|
+| `Index(DynamicCodeGridViewModel)` | GET | Renders the grid page. Populates `ViewBag.AuditTableName = "CustomCode"`, `ViewBag.RecordIdLabel = "Code ID"`. |
+| `SaveChanges(SaveDynamicCodeChangesRequest)` | POST | Inline grid save. Delegates to `DynamicCodeService.SaveChangesAsync` with temp-ID mapping. |
+| `GetCode(int id)` | GET | Returns a single row as JSON to populate the inline IDE panel fields. |
+| `SaveCode(IDEViewModel)` | POST | Compiles the code via `RSuite.Infrastructure.Core.DynamicExecution.DynamicCodeExecutor.CompileCode(...)`, then saves via `DynamicCodeService.SaveCodeFromIDEAsync`. Uses `AssemblyManager.RemoveAsseblyModel` to clear cached assemblies. Strips `System.Collections.Generic` and `Report.*` namespaces before persisting. |
+| `Delete(int id)` | POST | Delegates to `DynamicCodeService.DeleteAsync`. |
+| `LoadClassesFromNamespaces(string Namespaces)` | POST | Returns all public type names from the given namespaces (for Monaco keyword autocomplete). |
+
+**Known bug (§11.11):** `SaveCode` compiles via `executor.CompileCode(...)` but never inspects `rm.Success` / `rm.Errors` before calling `SaveCodeFromIDEAsync` — broken code can be saved and activated.
+
+**Route cache comments:** Several actions contain commented-out `DynamicRouteCache.RefreshAsync()` calls — the ERP now owns the route cache; Report does not need to refresh it.
+
+### 21.4.2 DynamicCodeService (`Services/DynamicCodeService.cs`)
+
+| Method | Description |
+|--------|-------------|
+| `GetAllAsync(filter)` | Loads all rows via `CustomCodeDAL.GetAllAsync`, applies in-memory sort + skip/take pagination. Does not use SQL `COUNT(*) OVER()` because the table is small. |
+| `SaveChangesAsync(changes, mode)` | Groups changes by row ID. Negative temp IDs → `CustomCodeDAL.AddAsync`. Existing IDs → capture before-image via `Dal.GetRowAsJsonAsync` → update → audit log (`UPDATE`). |
+| `DeleteAsync(id)` | Captures before-image JSON → deletes → audit log (`DELETE`) inside try/catch. Audit failure never fails a completed delete. |
+| `SaveCodeFromIDEAsync(model)` | For existing rows: loads current, calls `MergeForUpdate` (only overwrites non-blank incoming fields), updates, audits. For new rows: calls `AddAsync`. |
+| `GetCodeByIdAsync(id)` / `GetByControllerActionAsync(controller, action)` | Read-only lookups on `CustomCodeDAL`. |
+| `GetNextIdentityAsync()` | Returns next `CustomCodeId` for the grid's temp-ID generator. |
+
+Audit logging uses `ReportConfig.DynamicCodeTable` (`CustomCode`) and the primary key column `CustomCodeId`.
+
+### 21.4.3 CustomCodeDAL (`Services/CustomCodeDAL.cs`)
+
+Standalone DAL for the `CustomCode` table. Uses `System.Data.SqlClient` directly (`SqlConnection`, `SqlCommand`, `SqlParameter`) — **does not** use `Dal.GetFactory()` or the `DbProviderFactory` abstraction.
+
+| Method | Description |
+|--------|-------------|
+| `GetAllAsync(searchText)` | `SELECT * FROM CustomCode` with optional LIKE filter on `ControllerName`/`ActionName`/`Description`. |
+| `GetByIdAsync(id)` | Single row by `CustomCodeId`. |
+| `GetByControllerActionAsync(controller, action)` | Used by the ERP runtime path. |
+| `AddAsync(model)` | `INSERT` returning `SCOPE_IDENTITY()`. |
+| `UpdateAsync(model)` | `UPDATE` on all 5 data fields by `CustomCodeId`. |
+| `DeleteAsync(id)` | `DELETE` by `CustomCodeId`. |
+| `GetNextIdAsync()` | `SELECT ISNULL(MAX(CustomCodeId),0)+1`. |
+
+**Cross-database limitation:** See §14.4 — works on SQL Server environments only; fails on MySQL (GEETEE).
+
+### 21.4.4 NameSpaceController (`Controllers/NameSpaceController.cs`)
+
+| Action | Purpose |
+|--------|---------|
+| `NamespaceEditor(string ids, ...)` (partial) | Renders the `_NamespaceEditor.cshtml` partial: a textarea for namespace entry + a suggestion panel. Builds a namespace trie from `AppDomain.CurrentDomain.GetAssemblies()`. |
+| `Suggest(string filter, string namespc, string parent)` | GET: returns JSON array of matching namespace/class names for the suggestion panel. |
+
+### 21.4.5 IntellisenseController (`Controllers/IntellisenseController.cs`)
+
+| Action | Purpose |
+|--------|---------|
+| `CodeEditor(...)` (partial) | Renders the `_CodeEditor.cshtml` partial — Monaco editor with IntelliSense providers wired up. |
+| `Completions(string fullcode, string expression)` | POST: resolves the dot-expression type and returns its public properties and methods as Monaco `CompletionItem`s. Uses `Microsoft.CSharp.CSharpCodeProvider` to infer the expression's compile-time type, then reflect on it. |
+| `Signatures(string expression)` | POST: returns method parameter signatures for the given method expression. |
+
+**Type/member caching:** `IntellisenseController` maintains static `Dictionary<string, Type>` caches of resolved types and their members for the session lifetime. Includes a test-only `Vehicle` class at the top of the file for manual IntelliSense verification.
+
+### 21.4.6 Views
+
+#### `Views/DynamicCode/Index.cshtml`
+
+Grid page with the following sections:
+- **Toolbar:** search box, sort-column dropdown (Code ID / Controller Name / Action Name / Description), page-size selector, Add Row button.
+- **Grid table:** columns (Code ID, Controller Name, Action Name, Description, Actions). Actions column contains Edit, IDE, and Delete buttons. Inline edit form uses the same `data-*` attribute pattern as other entities.
+- **IDE panel** (`#ideSection`): embedded in the page; shown/hidden via `DynamicCode.js showIDE()`. Fields: Controller Name, Action Name, Description, Namespaces (textarea + `_NamespaceEditor` suggestion box), Code (Monaco via `_CodeEditor.cshtml`).
+- **Audit handlers:** inline JS handlers for View Audit / Deleted Records call `AuditTrail/AuditLogs.cshtml` with `AuditTableName=CustomCode`, `RecordIdLabel=Code ID`.
+- **Pagination:** same Bootstrap 3 pagination as other entity grids.
+
+#### `Views/DynamicCode/IDE.cshtml`
+
+Standalone IDE page (Layout = null). Loads the same `_CodeEditor.cshtml` Monaco partial. Used as a fallback; the primary IDE experience is the inline panel in `Index.cshtml`.
+
+#### `Views/Shared/_CodeEditor.cshtml`
+
+Razor partial that renders a full Monaco editor (monaco-editor 0.45.0 loaded from `cdnjs.cloudflare.com` CDN). Provides three custom providers:
+
+| Provider | Trigger | Purpose |
+|----------|---------|---------|
+| `registerCompletionItemProvider("csharp")` | typing | Keyword + class name autocomplete (server-provided class list + C# keyword list) |
+| `registerCompletionItemProvider("csharp", ["."])` | `.` | Dot-completion: posts the expression prefix to `IntellisenseController.Completions` and returns properties/methods |
+| `registerSignatureHelpProvider("csharp", ["("])` | `(` | Method signature help: posts to `IntellisenseController.Signatures` and returns parameter signatures |
+
+Editor config: `language: "csharp"`, `theme: "vs-dark"`, `automaticLayout: true`, `quickSuggestions: { other: true }`, `wordBasedSuggestions: "off"`. Hidden field syncs editor content on content change and form submit.
+
+#### `Views/Shared/_NamespaceEditor.cshtml`
+
+Razor partial with a textarea and a suggestion `<ul>`. Suggestion list populated via AJAX to `NameSpaceController.Suggest`. Selected namespace appended to textarea.
+
+### 21.4.7 JavaScript — `js/DynamicCode.js`
+
+| Function | Purpose |
+|----------|---------|
+| `showIDE(id)` | Fetches row via `DynamicCode/GetCode?id=...`, populates IDE panel fields, calls `loadClassesForNamespaces`, shows `#ideSection`. |
+| `hideIDE()` / `clearIDE()` | Hides IDE panel and clears all fields. |
+| `loadClassesForNamespaces(namespaces)` | Posts to `NameSpaceController.Suggest` with a filter; results are passed to Monaco via `window.updateClasses(...)` (defined in `_CodeEditor.cshtml`). |
+| Grid handlers | Add Row, Save (collectChanges + confirm modal + `SaveChanges` AJAX), Delete (confirm + `Delete` AJAX), Edit row, Open IDE, View Audit / Deleted Records (open `AuditTrail/AuditLogs.cshtml` in iframe via same handler pattern as other modules). |
+
+### 21.4.8 CSS — `Styles/DynamicCode.css`
+
+843 lines. Key sections:
+- **Grid** (same design-system tokens as other entities): `.modern-table-shell`, `.modern-report-table`, `.grid-text`, `.action-cell`, `.edit-row`, `.editing`.
+- **Toolbar + pagination:** `.report-toolbar`, `.bottom-bar`, `.pagination`.
+- **Modals:** `#deleteConfirmModal`, `#saveConfirmModal`, `#successModal` (same style as other entities).
+- **IDE panel** (`#ideSection`): `.ide-panel`, `.ide-panel-header`, `.ide-panel-fields` (3-column grid), `.ide-panel-namespaces` (fixed 420px), `.ide-panel-editor` (flex), `.ide-panel-footer`. Monaco height fix: `#ideSection .editor-container > div { height: 420px !important }`.
+- Responsive: `@media (max-width: 991px)` and `@media (max-width: 575px)` rules.
+
+### 21.4.9 Models — `Models/DynamicCodeModels.cs`
+
+| Class | Purpose |
+|-------|---------|
+| `DynamicCodeGridItem` | Grid row DTO: `DynamicCodeId`, `ControllerName`, `ActionName`, `Description`. |
+| `DynamicCodeChange` | Single cell change DTO: `DynamicCodeId`, `Column`, `OldValue`, `NewValue`, `IsNew`. |
+| `SaveDynamicCodeChangesRequest` | POST body: `Mode` (SAVE/CANCEL), `List<DynamicCodeChange>`. |
+| `SaveDynamicCodeChangesResult` | POST response: `Status`, `Dictionary<string,int> IdMappings`. |
+| `DynamicCodeGridViewModel` | Grid VM: `SearchText`, `SortColumn`/`SortDirection`, `PageNumber`, `PageSize`, `TotalRecords`, `Items`. |
+| `IDEViewModel` | IDE form VM: `CodeID`, `ControllerName`, `ActionName`, `Namespaces`, `Code`, `Description`. |
+
+### 21.4.10 Configuration
+
+| Source | Key | Value | Purpose |
+|--------|-----|-------|---------|
+| `Web.config` (line 47) | `DynamicCodeTable` | `CustomCode` | Table name for all Dynamic Code DAL queries |
+| `Web.config` (line 48) | `DynamicCodePageSize` | `7` | Default grid page size |
+| `Web.config` (line 51) | `DefaultNamespaces` | `Report.Controllers, Report.Services, System.Web.Mvc, System.Collections.Generic, System.Linq` | Base `using` set; shown in IDE panel on load |
+| `ReportConfig.cs` | `DynamicCodeTable` | reads from `Web.config` | Static accessor consumed by `DynamicCodeService` and `CustomCodeDAL` |
+
+## 21.5 ERP Runtime Model
+
+### 21.5.1 Request Interception
+
+`Global.asax.cs` registers `Application_BeginRequest`, which calls:
+
+```
+CallBackService.IsDynamicActionPresent(request.Url)
+```
+
+This resolves the controller and action from the URL path, then calls `CustomCodeDAL.GetByControllerAction(controller, action)`. If a matching row exists, the request path is rewritten to `DynamicCallBack/Execute` and the original controller/action logic is bypassed entirely.
+
+**Matching is by controller + action only** — no HTTP verb (GET/POST) is considered. If both GET and POST to the same controller/action have different semantics, only one override is possible.
+
+### 21.5.2 Compilation and Execution
+
+`CallBackService.Execute()` reads the `Namespaces` and `CustomCode` fields, invokes `CompilerService.Compile(code, namespaces)`, and then:
+
+```csharp
+// Simplified from CallBackService.cs
+var assembly = compileResult.CompiledAssembly;
+var instance = assembly.CreateInstance("DynamicCode.Namespace.ClassName");
+var method = instance.GetType().GetMethod("Execute");
+var result = method.Invoke(instance, null);
+// result is written directly to the HTTP response
+```
+
+**Recompiles every request** — there is no assembly cache. Edits saved in Report take effect on the very next matching ERP request.
+
+### 21.5.3 Code Body Requirements
+
+The compiled class is **not** a `Controller`. The `Json()` helper (inherited from `Controller`) does not exist in scope.
+
+```csharp
+// ✗ WRONG — "The name 'Json' does not exist in the current context"
+return Json(new { data = "value" });
+
+// ✓ CORRECT — explicit JsonResult construction
+return new JsonResult
+{
+    Data = new { ProductModelCollection = new[] { new { Id = 1, label = "DYNAMIC MODEL" } } },
+    JsonRequestBehavior = JsonRequestBehavior.AllowGet
+};
+```
+
+**Verified override example:**
+- Controller: `VehicleCallBack`
+- Action: `GetVehicleModelOnManufacturer`
+- Code: returns `ProductModelCollection` with a single DYNAMIC MODEL option
+- Visible on the ERP Vehicle master page (`/Vehicle?...`) Manufacturer → Vehicle Model dropdown (new-record form)
+
+## 21.6 Audit Integration
+
+- Grid UPDATE and DELETE operations follow the same audit pattern as all other Report entities: `DynamicCodeService.GetRowAsJsonAsync()` captures the before-image via `Dal.GetRowAsJsonAsync(ReportConfig.DynamicCodeTable, "CustomCodeId", id)` and writes it to `com_mst_audit_log` via `AuditLogService.LogChangeAsync`.
+- Audit capture on DELETE is wrapped in a try/catch — a completed delete is never rolled back due to audit failure.
+- The grid includes a **Deleted Records** button (same pattern as other modules) that opens `AuditTrail/AuditLogs.cshtml` in an iframe with `AuditTableName=CustomCode` and `RecordIdLabel=Code ID`.
+
+## 21.7 Known Issues
+
+| # | Issue | Location | Impact | Status |
+|---|-------|----------|--------|--------|
+| 1 | **SaveCode persists broken code** | `DynamicCodeController.cs:180-198` | A snippet that fails compilation is still saved; the ERP then errors on every matching request | Open (§11.11) |
+| 2 | **CustomCodeDAL hardcodes SqlClient** | `CustomCodeDAL.cs` | Dynamic Code screen fails on MySQL (GEETEE) | Open (§14.4) |
+| 3 | **No HTTP verb in matching** | `CallBackService` (ERP) | GET and POST to the same controller/action cannot be overridden independently | Current design limitation |
+| 4 | **Dead override row** | `CustomCode` table data | `VehicleCallBack/GetVehicleModelByVehicle` has no UI callers; its override row generates errors on every GET | Data cleanup needed |
+| 5 | **Monaco from CDN** | `_CodeEditor.cshtml` | External network dependency; IDE won't load without internet | Low priority |
+
+## 21.8 Verification Test Case
+
+**Override tested:** `VehicleCallBack/GetVehicleModelOnManufacturer` (GET)
+
+| Step | Detail |
+|------|--------|
+| 1 | In Report, open Dynamic Code grid → Add Row: Controller = `VehicleCallBack`, Action = `GetVehicleModelOnManufacturer`, Description = `Override Vehicle Model on Vehicle master` |
+| 2 | Open IDE → Namespaces = default (`System.Web.Mvc, System.Linq`) |
+| 3 | Code: `return new JsonResult { Data = new { ProductModelCollection = new[] { new { Id = 1, label = "DYNAMIC MODEL" } } }, JsonRequestBehavior = JsonRequestBehavior.AllowGet };` |
+| 4 | Click Save Code |
+| 5 | In the ERP, open the Vehicle master → New form: change Manufacturer dropdown → Vehicle Model dropdown should show **DYNAMIC MODEL** |
+| 6 | On edit forms, the effect may not be visible due to `Vehicle.js:72-74` (resets Vehicle Model to current value on Manufacturer change) — verify using the New form or network inspection |
 
 ---
 

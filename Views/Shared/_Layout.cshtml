@@ -177,42 +177,46 @@
                 </button>
             </div>
                 <div class="navbar-collapse collapse">
-                <ul class="nav navbar-nav nav-left-group">
-                    <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "Report" ? "active" : "")">
-                        @Html.ActionLink("Report Master", "Index", "Report")
-                    </li>
-                    <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "CompanyConfig" ? "active" : "")">
-                        @Html.ActionLink("Company Config", "Index", "CompanyConfig")
-                    </li>
-                    <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "AlertConfig" ? "active" : "")">
-                        @Html.ActionLink("Alert Config", "Index", "AlertConfig")
-                    </li>
-                    @if (Session["Role"]?.ToString() == "SuperAdmin")
-                    {
-                        <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "User" ? "active" : "")">
-                            @Html.ActionLink("User Master", "Index", "User")
+                    <ul class="nav navbar-nav nav-left-group">
+                        <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "Report" ? "active" : "")">
+                            @Html.ActionLink("Report Master", "Index", "Report")
                         </li>
-                    }
-                </ul>
-                <ul class="nav navbar-nav nav-right-group">
-                    <li class="nav-info-item">
-                        <span class="glyphicon glyphicon-user nav-icon"></span>
-                        <span class="nav-label">@Session["Username"]</span>
-                    </li>
-                    <li class="nav-info-item">
-                        <span class="glyphicon glyphicon-hdd nav-icon"></span>
-                        <span class="nav-label">@Session["CompanyCode"]</span>
-                    </li>
-                    <li>
-                        <a href="@Url.Action("ChangePassword", "Account")" class="btn-change-pw-nav">Change Password</a>
-                    </li>
-                    <li>
-                        <form method="post" action="@Url.Action("Logout", "Home")" class="nav-logout-form">
-                            <button type="submit" class="btn-logout">Logout</button>
-                        </form>
-                    </li>
-                </ul>
-            </div>
+                        <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "CompanyConfig" ? "active" : "")">
+                            @Html.ActionLink("Company Config", "Index", "CompanyConfig")
+                        </li>
+                        <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "AlertConfig" ? "active" : "")">
+                            @Html.ActionLink("Alert Config", "Index", "AlertConfig")
+                        </li>
+                        <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "DynamicCode" ? "active" : "")">
+                            @Html.ActionLink("Dynamic Code", "Index", "DynamicCode")
+                        </li>
+
+                        @if (Session["Role"]?.ToString() == "SuperAdmin")
+                        {
+                            <li class="@(ViewContext.RouteData.Values["controller"].ToString() == "User" ? "active" : "")">
+                                @Html.ActionLink("User Master", "Index", "User")
+                            </li>
+                        }
+                    </ul>
+                    <ul class="nav navbar-nav nav-right-group">
+                        <li class="nav-info-item">
+                            <span class="glyphicon glyphicon-user nav-icon"></span>
+                            <span class="nav-label">@Session["Username"]</span>
+                        </li>
+                        <li class="nav-info-item">
+                            <span class="glyphicon glyphicon-hdd nav-icon"></span>
+                            <span class="nav-label">@Session["CompanyCode"]</span>
+                        </li>
+                        <li>
+                            <a href="@Url.Action("ChangePassword", "Account")" class="btn-change-pw-nav">Change Password</a>
+                        </li>
+                        <li>
+                            <form method="post" action="@Url.Action("Logout", "Home")" class="nav-logout-form">
+                                <button type="submit" class="btn-logout">Logout</button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
         </div>
     </div>
     @*<script>

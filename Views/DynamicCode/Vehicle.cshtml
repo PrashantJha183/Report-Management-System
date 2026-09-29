@@ -1,0 +1,147 @@
+@model dynamic
+@{
+    Layout = null;
+    string vehicleNo = Model != null ? (Model.VehicleNo as string) : null;
+    string color = Model != null ? (Model.Color as string) : null;
+    System.Collections.Generic.IList<string> items = Model != null ? (Model.Items as System.Collections.Generic.IList<string>) : null;
+}
+
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>Vehicle</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background-color: #f4f6f9;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: auto;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: #2f6fed;
+            color: white;
+            padding: 18px 25px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .card-body {
+            padding: 25px;
+        }
+
+        .info-row {
+            display: flex;
+            border-bottom: 1px solid #e5e5e5;
+            padding: 12px 0;
+        }
+
+            .info-row:last-child {
+                border-bottom: none;
+            }
+
+        .label {
+            width: 180px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .value {
+            flex: 1;
+            color: #222;
+        }
+
+        .vehicle-icon {
+            text-align: center;
+            font-size: 60px;
+            margin-bottom: 15px;
+        }
+
+        .error {
+            color: #dc2626;
+        }
+
+        @@media(max-width:600px) {
+            .info-row {
+                flex-direction: column;
+            }
+
+            .label {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+
+</head>
+<body>
+
+    <div class="container">
+
+        <div class="card">
+
+            <div class="card-header">
+                Vehicle Info
+            </div>
+
+            <div class="card-body">
+
+                <div class="vehicle-icon">&#128663;</div>
+
+                @if (Model == null)
+                {
+                    <div class="error">No vehicle data returned.</div>
+                }
+                else
+                {
+                    <div class="info-row">
+                        <div class="label">Vehicle Number</div>
+                        <div class="value">@(vehicleNo ?? "-")</div>
+                    </div>
+
+                    <div class="info-row">
+                        <div class="label">Color</div>
+                        <div class="value">@(color ?? "-")</div>
+                    </div>
+
+                    <div class="info-row">
+                        <div class="label">Items</div>
+                        <div class="value">
+                            @if (items != null && items.Count > 0)
+                            {
+                                foreach (var item in items)
+                                {
+                                    <span>@item &nbsp;</span>
+                                }
+                            }
+                            else
+                            {
+                                <text>-</text>
+                            }
+                        </div>
+                    </div>
+                }
+
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+</html>

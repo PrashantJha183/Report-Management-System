@@ -68,6 +68,10 @@ namespace Report.Controllers
                 Session["ConnectionString"] = selectedConnection.ConnectionString;
                 Session["DbType"] = selectedConnection.DbType;
                 Session["CompanyCode"] = selectedConnection.Name;
+                Session["DatabaseKey"] = selectedConnection.CompanyCode;
+
+                // Execution now runs in Sumeet (ERP); route cache is not maintained here.
+                //await DynamicRouteCache.RefreshAsync();
 
                 return RedirectToAction("Index", "Report");
             }
@@ -84,6 +88,8 @@ namespace Report.Controllers
         {
             Session["IsLoggedIn"] = null;
             Session.Clear();
+            // Execution now runs in Sumeet (ERP); route cache is not maintained here.
+            //DynamicRouteCache.Clear();
             return RedirectToAction("Index");
         }
     }

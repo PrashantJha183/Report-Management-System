@@ -38,7 +38,7 @@ namespace Report.Services
         public static string AlertConfigAttachmentTable => GetSetting("AlertConfigAttachmentTable", "com_mst_alertconfigattachment");
         public static string LinkItemTable => GetSetting("LinkItemTable", "com_mst_link_item");
         public static string CompanyConfigTable => GetSetting("CompanyConfigTable", "com_mst_companyconfig");
-        public static string AuditLogTable => GetSetting("AuditLogTable", "com_mst_audit_log");
+        public static string AuditLogTable => GetSetting("AuditLogTable", "admin_audit");
 
         // ── Page Sizes ──
         public static int ReportPageSize => GetIntSetting("ReportPageSize", 5);
@@ -49,6 +49,12 @@ namespace Report.Services
         public static int AlertConfigAttachmentPageSize => GetIntSetting("AlertConfigAttachmentPageSize", 5);
         public static int CompanyConfigPageSize => GetIntSetting("CompanyConfigPageSize", 5);
         public static int MaxPageSize => GetIntSetting("MaxPageSize", 100);
+
+        // ── Dynamic Code ──
+        public static string DynamicCodeTable => GetSetting("DynamicCodeTable", "CustomCode");
+        public static int DynamicCodePageSize => GetIntSetting("DynamicCodePageSize", 7);
+
+
 
         // ── DB-specific lock hints ──
         public static string GetTableLockHint(string dbType)
@@ -78,9 +84,10 @@ namespace Report.Services
             return connections.Select(c => new ConnectionInfo
             {
                 Name = (string)c.Element("Name"),
+                CompanyCode = (string)c.Element("CompanyCode"),
                 ConnectionString = (string)c.Element("ConnectionString"),
                 DbType = (string)c.Element("DbType")
-            }).ToList();
+            }).ToList();    
         }
     }
 }

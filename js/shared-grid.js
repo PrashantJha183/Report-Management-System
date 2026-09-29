@@ -44,7 +44,6 @@ var saveFormRow = null;
 var deleteTarget = null;
 var deleteBtn = null;
 
-/* ---------- Toast ---------- */
 function showToast(message, type) {
     var $toast = $('#toast');
     $toast.text(message).css('background', type === 'success' ? '#4CAF50' : '#f44336').fadeIn(200);

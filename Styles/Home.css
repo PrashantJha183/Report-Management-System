@@ -229,10 +229,16 @@ body::after {
 }
 
 .db-select .db-panel.open {
-    max-height: 260px;
+    max-height: 200px;
     opacity: 1;
     margin-top: 0;
     overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.db-select .db-panel.open::-webkit-scrollbar {
+    display: none;
 }
 
 .db-select .db-panel .db-option {

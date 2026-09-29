@@ -11,6 +11,7 @@ namespace Report.Models
         public string Name { get; set; }
         public string ConnectionString { get; set; }
         public string DbType { get; set; }
+        public string CompanyCode { get; set; }
     }
 
 }

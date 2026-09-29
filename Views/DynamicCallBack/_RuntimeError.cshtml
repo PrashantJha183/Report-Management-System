@@ -1,0 +1,89 @@
+@model dynamic
+@{
+    Layout = null;
+    var errors = ViewBag.RuntimeErrors as List<string> ?? new List<string>();
+}
+
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>Dynamic Code Error</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background-color: #f4f6f9;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: auto;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: #dc2626;
+            color: white;
+            padding: 18px 25px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .card-body {
+            padding: 25px;
+        }
+
+        .error-row {
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e5e5;
+            color: #b91c1c;
+            font-family: Consolas, monospace;
+            font-size: 14px;
+        }
+
+            .error-row:last-child {
+                border-bottom: none;
+            }
+    </style>
+
+</head>
+<body>
+
+    <div class="container">
+
+        <div class="card">
+
+            <div class="card-header">
+                Dynamic Code Error
+            </div>
+
+            <div class="card-body">
+                @if (errors.Count == 0)
+                {
+                    <div class="error-row">Unknown error.</div>
+                }
+                else
+                {
+                    foreach (var error in errors)
+                    {
+                        <div class="error-row">@error</div>
+                    }
+                }
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+</html>
